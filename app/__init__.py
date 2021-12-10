@@ -20,4 +20,4 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "mysql://{0}:{1}@{2}/{3}".format(db_user
 db = SQLAlchemy(app)
 
 from app import views
-from app import ballots_views
+from app import ballots_views, elections_views, trustees_views, voters_views

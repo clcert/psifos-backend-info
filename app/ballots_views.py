@@ -6,7 +6,7 @@ from flask import Response
 import json
 
 
-@app.route("/<election_uuid>/encrypted_ballots")
+@app.route("/elections/<election_uuid>/ballots")
 def get_encrypted_ballots(election_uuid):
     # 1. get internal election_id from election_uuid
     st_1 = text('select id from helios_election where uuid = \"%s\"' % election_uuid)
@@ -28,13 +28,14 @@ def get_encrypted_ballots(election_uuid):
                 str(voters_id).replace('[', '(').replace(']', ')'))
     res_3 = db.engine.execute(st_3)
     for row in res_3:
-        vote_dict = {'cast_at': row[3], 'vote_hash': row[2], 'voter_uuid': voters_uuid[row[0]], 'last_vote': ast.literal_eval(row[1])}
+        vote_dict = {'cast_at': row[3], 'vote_hash': row[2], 'voter_uuid': voters_uuid[row[0]],
+                     'last_vote': ast.literal_eval(row[1])}
         try:
             ballots[row[0]].append(vote_dict)
         except KeyError:
             ballots[row[0]] = [vote_dict]
 
-    # 4. select, if there's the case, the last ballot casted by the voter
+    # 4. select, if there's the case, the last ballot cast by the voter
     encrypted_ballots = []
     for voter in ballots.keys():
         if len(ballots[voter]) == 1:
@@ -52,10 +53,3 @@ def get_encrypted_ballots(election_uuid):
             encrypted_ballots.append(last_vote)
 
     return Response(json.dumps(encrypted_ballots), mimetype='application/json')
-    # return encrypted_ballots
-
-    # statement = text('select * from helios_auth_user')
-    # result = db.engine.execute(statement)
-    # names = [row[0] for row in result]
-    # print(names)
-    # return "Hello!"
