@@ -9,7 +9,7 @@ import base64
 
 
 @app.route("/elections/<election_uuid>/ballots")
-def get_all_short_ballots(election_uuid):
+def get_last_short_ballots(election_uuid):
     # 1. get internal election_id from election_uuid
     st_1 = text('select id from helios_election where uuid = \"%s\"' % election_uuid)
     res_1 = db.engine.execute(st_1)
@@ -69,8 +69,8 @@ def get_all_short_ballots(election_uuid):
     return Response(json.dumps(encrypted_ballots), mimetype='application/json')
 
 
-@app.route("/elections/<election_uuid>/last_ballots")
-def get_last_ballots(election_uuid):
+@app.route("/elections/<election_uuid>/complete_ballots")
+def get_last_complete_ballots(election_uuid):
     # 1. get internal election_id from election_uuid
     st_1 = text('select id from helios_election where uuid = \"%s\"' % election_uuid)
     res_1 = db.engine.execute(st_1)
