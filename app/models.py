@@ -2,7 +2,7 @@ class Election:
     def __init__(self, cast_url="", description="", frozen_at="", max_weight=1,
                  name="", normalization=False, openreg=False, public_key=dict, questions=list,
                  short_name="", use_voter_aliases=False, uuid="", voters_hash="",
-                 voting_ends_at="", voting_starts_at=""):
+                 voting_ends_at="", voting_starts_at="", voting_stopped=None):
         self.cast_url = cast_url
         self.description = description
         self.frozen_at = frozen_at
@@ -18,12 +18,13 @@ class Election:
         self.voters_hash = voters_hash
         self.voting_ends_at = voting_ends_at
         self.voting_starts_at = voting_starts_at
+        self.voting_stopped = voting_stopped
 
 
 class Trustee:
     def __init__(self, decryption_factors=list, decryption_proofs=list,
                  email="", pok=dict, public_key=dict, public_key_hash="",
-                 uuid=""):
+                 uuid="", name=""):
         self.decryption_factors = decryption_factors
         self.decryption_proofs = decryption_proofs
         self.email = email
@@ -31,6 +32,8 @@ class Trustee:
         self.public_key = public_key
         self.public_key_hash = public_key_hash
         self.uuid = uuid
+        self.name = name
+
 
 
 class Voter:
