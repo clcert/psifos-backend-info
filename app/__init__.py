@@ -1,6 +1,6 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 import configparser
+from sqlalchemy import create_engine
 
 app = Flask(__name__)
 
@@ -17,7 +17,6 @@ db_name = config['local']['database']
 # configuring our database uri
 app.config["SQLALCHEMY_DATABASE_URI"] = "mysql://{0}:{1}@{2}/{3}".format(db_user, db_pass, db_host, db_name)
 
-db = SQLAlchemy(app)
+engine = create_engine("mysql://{0}:{1}@{2}/{3}".format(db_user, db_pass, db_host, db_name))
 
-from app import views
 from app import ballots_views, elections_views, trustees_views, voters_views

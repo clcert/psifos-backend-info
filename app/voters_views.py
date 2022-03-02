@@ -1,6 +1,5 @@
-from app import app, db
+from app import app, engine
 from app.models import Voter
-from sqlalchemy import text
 from flask import Response
 import json
 import hashlib
@@ -9,15 +8,22 @@ import base64
 
 @app.route("/elections/<election_uuid>/voters")
 def get_election_voters(election_uuid):
+    con = engine.connect()
+
     # 1. get internal election id from election uuid
-    st_1 = text('select id from helios_election where uuid = \"%s\"' % election_uuid)
-    res_1 = db.engine.execute(st_1)
-    election_id = int([row[0] for row in res_1][0])
+    query_1 = "select id from helios_election where uuid = %(uuid)s"
+    res_1 = con.execute(query_1, uuid=election_uuid)
+    election_id = None
+    for row in res_1:
+        if row is not None:
+            election_id = int(row[0])
+    if election_id is None:
+        return Response("Election not found", status=404)
 
     # 2. get all voters
-    st_2 = text('select voter_name, uuid, voter_login_id, user_id from helios_voter '
-                'where election_id = %d' % election_id)
-    res_2 = db.engine.execute(st_2)
+    query_2 = "select voter_name, uuid, voter_login_id, user_id from helios_voter where election_id = %(election_id)s"
+    res_2 = con.execute(query_2, election_id=election_id)
+    con.close()
     voters = []
     for row in res_2:
         voter_id_hash = base64.b64encode(hashlib.sha256(str(row[2]).encode('utf-8')).digest())[:-1].decode('ascii')
