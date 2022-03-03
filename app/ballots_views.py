@@ -41,6 +41,9 @@ def get_last_short_ballots(election_uuid):
         voter_hash = base64.b64encode(hashlib.sha256(serialized_voter.encode('utf-8')).digest())[:-1].decode('ascii')
         voters_hash[row[0]] = voter_hash
 
+    if not voters_id:
+        return Response(json.dumps(voters_id), mimetype='application/json')
+
     # 3. get all ballots from those voters
     ballots = {}
     query_3 = "select voter_id, vote_hash, cast_at from helios_castvote where verified_at is not null and voter_id " \
@@ -98,6 +101,9 @@ def get_last_complete_ballots(election_uuid):
         voters_id.append(row[0])
         voters_uuid[row[0]] = row[1]
 
+    if not voters_id:
+        return Response(json.dumps(voters_id), mimetype='application/json')
+
     # 3. get all ballots from those voters
     ballots = {}
     query_3 = "select voter_id, vote, vote_hash, cast_at from helios_castvote where verified_at is not null and " \
@@ -136,6 +142,16 @@ def get_last_complete_ballots(election_uuid):
 def get_all_ballots_by_user(election_uuid, voter_uuid):
     con = engine.connect()
 
+    # 0. get internal election_id from election_uuid
+    query_0 = "select id from helios_election where uuid = %(uuid)s"
+    res_0 = con.execute(query_0, uuid=election_uuid)
+    election_id = None
+    for row in res_0:
+        if row is not None:
+            election_id = int(row[0])
+    if election_id is None:
+        return Response("Election not found", status=404)
+
     # 1. get voter id from voter uuid
     query_1 = "select id, voter_name, voter_login_id from helios_voter where uuid = %(uuid)s"
     res_1 = con.execute(query_1, uuid=voter_uuid)
@@ -144,6 +160,9 @@ def get_all_ballots_by_user(election_uuid, voter_uuid):
         voter_id = row[0]
         name = row[1]
         voter_id_hash = base64.b64encode(hashlib.sha256(str(row[2]).encode('utf-8')).digest())[:-1].decode('ascii')
+
+    if voter_id == '':
+        return Response("Voter not found", status=404)
 
     # 2. create serialized voter and voter hash values
     serialized_voter = '{\"election_uuid\": \"%s\", ' \
@@ -170,6 +189,16 @@ def get_all_ballots_by_user(election_uuid, voter_uuid):
 def get_last_ballot_by_user(election_uuid, voter_uuid):
     con = engine.connect()
 
+    # 0. get internal election_id from election_uuid
+    query_0 = "select id from helios_election where uuid = %(uuid)s"
+    res_0 = con.execute(query_0, uuid=election_uuid)
+    election_id = None
+    for row in res_0:
+        if row is not None:
+            election_id = int(row[0])
+    if election_id is None:
+        return Response("Election not found", status=404)
+
     # 1. get voter id from voter uuid
     query_1 = "select id, voter_name, voter_login_id from helios_voter where uuid = %(uuid)s"
     res_1 = con.execute(query_1, uuid=voter_uuid)
@@ -178,6 +207,9 @@ def get_last_ballot_by_user(election_uuid, voter_uuid):
         voter_id = row[0]
         name = row[1]
         voter_id_hash = base64.b64encode(hashlib.sha256(str(row[2]).encode('utf-8')).digest())[:-1].decode('ascii')
+
+    if voter_id == '':
+        return Response("Voter not found", status=404)
 
     # 2. create serialized voter and voter hash values
     serialized_voter = '{\"election_uuid\": \"%s\", ' \
