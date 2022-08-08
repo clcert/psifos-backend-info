@@ -1,6 +1,6 @@
 import ast
 
-from app import app, engine
+from app.main import app, engine
 from flask import Response
 import json
 import hashlib

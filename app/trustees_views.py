@@ -1,4 +1,4 @@
-from app import app, engine
+from app.main import app, engine
 from app.models import Trustee
 from flask import Response
 import json
