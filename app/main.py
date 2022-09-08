@@ -1,20 +1,40 @@
+from fastapi import FastAPI
+
+from app.config import settings
+
+from .database import Base, engine
+from .psifos.routes import api_router
+
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
+
+from starlette_context import middleware, plugins
+
 import os
 
-from flask import Flask
-from sqlalchemy import create_engine
+Base.metadata.create_all(engine)
 
-app = Flask(__name__)
+app = FastAPI()
 
-# Connection credentials
-db_user = os.getenv("DB_USER")
-db_pass = os.getenv("DB_PASS")
-db_name = os.getenv("DB_NAME")
-db_host = os.getenv("DB_HOST")
-db_port = os.getenv("DB_PORT")
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 
-db_url = "mysql://{0}:{1}@{2}/{3}".format(db_user, db_pass, db_host, db_name)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-# configuring our database uri
-app.config["SQLALCHEMY_DATABASE_URI"] = db_url
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-engine = create_engine(db_url)
+app.add_middleware(
+    middleware.ContextMiddleware,
+    plugins=(
+        plugins.ForwardedForPlugin(),
+    ),
+)
+
+# Routes
+app.include_router(api_router)
