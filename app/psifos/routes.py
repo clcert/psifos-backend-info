@@ -1,4 +1,3 @@
-from urllib import response
 from fastapi import APIRouter, Depends
 from app.dependencies import get_db
 from app.psifos.model import crud, schemas
@@ -50,3 +49,14 @@ def get_trustees_election(election_uuid: str, db: Session = Depends(get_db)):
 def get_trustee(trustee_uuid: str, db: Session = Depends(get_db)):
 
     return crud.get_trustee_by_uuid(db=db, trustee_uuid=trustee_uuid)
+
+
+#----- CastVote routes -----
+
+@api_router.get("/election/{election_uuid}/cast-votes", response_model=list[schemas.CastVoteOut], status_code=200)
+def get_cast_votes(election_uuid: str, db: Session = Depends(get_db)):
+
+    election = crud.get_election_by_uuid(db=db, uuid=election_uuid)
+    voters = crud.get_voters_by_election_id(db=db, election_id=election.id)
+    voters_id = [v.id for v in voters]
+    return crud.get_votes_by_ids(db=db, voters_id=voters_id)

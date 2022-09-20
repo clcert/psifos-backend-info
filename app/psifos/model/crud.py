@@ -5,7 +5,6 @@ CRUD utils for Psifos
 01/08/2022
 """
 
-from pyexpat import model
 from sqlalchemy.orm import Session
 
 from app.psifos.model import models
@@ -16,9 +15,15 @@ from app.psifos.model import models
 
 def get_voters_by_election_id(db: Session, election_id: int):
     return db.query(models.Voter).filter(models.Voter.election_id == election_id).all()
+    
+def get_votes_by_ids(db: Session, voters_id: list):
+    return db.query(models.CastVote).filter(models.CastVote.voter_id.in_(voters_id)).all()
 
 
 # ----- CastVote CRUD Utils -----
+
+def get_election_cast_votes(db: Session, election_uuid: str):
+    return db.query(models.CastVote).filter(models.CastVote)
 
 
 # ----- AuditedBallot CRUD Utils -----

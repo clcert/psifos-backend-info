@@ -88,7 +88,6 @@ class CastVoteOut(CastVoteBase):
     Schema for reading/returning castvote data.
     """
 
-    id: int
     vote_hash: str | None
     vote_tinyhash: str | None
     valid_cast_votes: int
@@ -121,13 +120,10 @@ class VoterOut(VoterBase):
     Schema for reading/returning voter data.
     """
 
-    id: int
     uuid: str
     voter_login_id: str
     voter_name: str
     voter_weight: int
-
-    cast_vote: CastVoteOut = None
 
     class Config:
         orm_mode = True
