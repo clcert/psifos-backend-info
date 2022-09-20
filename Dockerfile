@@ -1,7 +1,11 @@
-FROM tiangolo/meinheld-gunicorn-flask:python3.9
+FROM python:3.10
 
-COPY ./requirements.txt /app/requirements.txt
+COPY ./requirements.txt /tmp/requirements.txt
 
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+RUN pip install -r /tmp/requirements.txt
 
-COPY ./app /app
+COPY ./ /app
+
+WORKDIR /app
+
+CMD uvicorn app.main:app --host 0.0.0.0 --port 8000
