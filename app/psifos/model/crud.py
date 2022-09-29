@@ -19,12 +19,16 @@ def get_voters_by_election_id(db: Session, election_id: int):
 def get_votes_by_ids(db: Session, voters_id: list):
     return db.query(models.CastVote).filter(models.CastVote.voter_id.in_(voters_id)).all()
 
+def get_voters_page(db: Session, election_id: int, init: int, end: int):
+    return db.query(models.Voter).filter(models.Voter.election_id == election_id).offset(init).limit(end).all()
 
 # ----- CastVote CRUD Utils -----
 
 def get_election_cast_votes(db: Session, election_uuid: str):
     return db.query(models.CastVote).filter(models.CastVote)
 
+def get_hashes_vote(db: Session, election_uuid: str, voters_id: list):
+    return db.query(models.CastVote).filter(models.CastVote.voter_id.in_(voters_id)).with_entities(models.CastVote.vote_hash).all()
 
 # ----- AuditedBallot CRUD Utils -----
 # (TODO)

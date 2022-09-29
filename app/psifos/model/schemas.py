@@ -191,3 +191,10 @@ class DecryptionIn(BaseModel):
 class TrusteeHome(BaseModel):
     trustee: TrusteeOut
     election: ElectionOut
+
+class UrnaOut(BaseModel):
+    voters: list[VoterOut] = []
+    cast_vote: list[CastVoteOut] = []
+    position: int
+    class Config:
+        orm_mode = True
