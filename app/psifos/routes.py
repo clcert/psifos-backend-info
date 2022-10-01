@@ -7,10 +7,13 @@ api_router = APIRouter(prefix="/psifos/api/public")
 
 #----- Election routes -----
 
-@api_router.get("/elections", response_model=list[schemas.ElectionOut], status_code=200)
-def get_elections(db: Session = Depends(get_db)):
+@api_router.post("/elections", response_model=list[schemas.ElectionOut], status_code=200)
+def get_elections(data: dict = {}, db: Session = Depends(get_db)):
 
-    return crud.get_elections(db=db)
+    page = data.get("page", 0)
+    page_size = data.get("page_size", None)
+
+    return crud.get_elections(db=db, page=page, page_size=page_size)
 
  
 @api_router.get("/election/{election_uuid}", response_model=schemas.ElectionOut, status_code=200)
@@ -28,22 +31,30 @@ def get_election_results(election_uuid: str, db: Session = Depends(get_db)):
 
 #----- Voters routes -----
 
-@api_router.get("/election/{election_uuid}/voters", response_model=list[schemas.VoterOut], status_code=200)
-def get_voters(election_uuid: str, db: Session = Depends(get_db)):
+@api_router.post("/election/{election_uuid}/voters", response_model=list[schemas.VoterOut], status_code=200)
+def get_voters(election_uuid: str, data: dict = {}, db: Session = Depends(get_db)):
     """
     Route for get voters
     """
+    page = data.get("page", 0)
+    page_size = data.get("page_size", None)
+
     election = crud.get_election_by_uuid(db, election_uuid)
-    return crud.get_voters_by_election_id(db=db, election_id=election.id)
+    return crud.get_voters_by_election_id(db=db, election_id=election.id, page=page, page_size=page_size)
 
 
 #----- Trustee routes -----
 
-@api_router.get("/election/{election_uuid}/trustees", status_code=200)
-def get_trustees_election(election_uuid: str, db: Session = Depends(get_db)):
+@api_router.post("/election/{election_uuid}/trustees", status_code=200)
+def get_trustees_election(election_uuid: str, data: dict = None, db: Session = Depends(get_db)):
+    """
+    Route for get trustees
+    """
+    page = data.get("page", 0)
+    page_size = data.get("page_size", None)
 
     election = crud.get_election_by_uuid(db=db, uuid=election_uuid)
-    return crud.get_trustees_by_election_id(db=db, election_id=election.id)
+    return crud.get_trustees_by_election_id(db=db, election_id=election.id, page=page, page_size=page_size)
 
 @api_router.get("/trustee/{trustee_uuid}", response_model=schemas.TrusteeOut, status_code=200)
 def get_trustee(trustee_uuid: str, db: Session = Depends(get_db)):
@@ -63,12 +74,12 @@ def get_cast_votes(election_uuid: str, db: Session = Depends(get_db)):
 
 
 @api_router.post("/election/{election_uuid}/votes", response_model=schemas.UrnaOut, status_code=200)
-def get_votes(election_uuid: str, data: dict, db: Session = Depends(get_db)):
+def get_votes(election_uuid: str, data: dict = {}, db: Session = Depends(get_db)):
 
 
-    init = data["init"]
-    end = data["end"]
-    vote_hash = data["vote_hash"]
+    page = data.get("page", 0)
+    page_size = data.get("page_size", None)
+    vote_hash = data.get("vote_hash", "")
     election = crud.get_election_by_uuid(db=db, uuid=election_uuid)
 
     if vote_hash != "":
@@ -78,13 +89,13 @@ def get_votes(election_uuid: str, data: dict, db: Session = Depends(get_db)):
 
         if (vote_hash,) in hash_votes:
             index_hash = hash_votes.index((vote_hash,))
-            init = index_hash - (index_hash % end)
+            page = index_hash - (index_hash % page_size)
 
-    voters_page = crud.get_voters_page(db=db, election_id=election.id, init=init, end=end)
+    voters_page = crud.get_voters_by_election_id(db=db, election_id=election.id, page=page, page_size=page_size)
     voters_id = [v.id for v in voters_page]
     cast_votes = crud.get_votes_by_ids(db=db, voters_id=voters_id)
 
     voters = [schemas.VoterOut.from_orm(v) for v in voters_page]
     cast_votes = [schemas.CastVoteOut.from_orm(c) for c in cast_votes]
 
-    return schemas.UrnaOut(voters=voters, cast_vote=cast_votes, position=init)
+    return schemas.UrnaOut(voters=voters, cast_vote=cast_votes, position=page)
