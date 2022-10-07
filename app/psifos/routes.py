@@ -3,7 +3,8 @@ from app.dependencies import get_db
 from app.psifos.model import crud, schemas
 from sqlalchemy.orm import Session
 
-api_router = APIRouter(prefix="/psifos/api/public")
+# api_router = APIRouter(prefix="/psifos/api/public")
+api_router = APIRouter()
 
 #----- Election routes -----
 
