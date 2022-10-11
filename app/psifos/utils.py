@@ -59,4 +59,16 @@ def do_cast_vote_checks(request, election, voter):
     return True, None
 
 
+def paginate(data_json: dict):
+    """
+    Handles pagination
+    
+    """
 
+    page = data_json.get("page", 0)
+
+    page_size = data_json.get("page_size", 500)
+    page_size = page_size if page_size <= 50 else 50
+    page = page_size * page
+
+    return page, page_size

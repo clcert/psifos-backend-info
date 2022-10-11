@@ -1,3 +1,4 @@
+from app.psifos.utils import paginate
 from fastapi import APIRouter, Depends
 from app.dependencies import get_db
 from app.psifos.model import crud, schemas
@@ -24,9 +25,7 @@ def get_elections(data: dict = {}, db: Session = Depends(get_db)):
     
     """
 
-    page = data.get("page", 0)
-    page_size = data.get("page_size", None)
-    page = page_size * page if page_size else None
+    page, page_size = paginate(data)
 
     return crud.get_elections(db=db, page=page, page_size=page_size)
 
@@ -73,9 +72,7 @@ def get_voters(election_uuid: str, data: dict = {}, db: Session = Depends(get_db
       page_size: Number of elements to display per page
     }
     """
-    page = data.get("page", 0)
-    page_size = data.get("page_size", None)
-    page = page_size * page if page_size else None
+    page, page_size = paginate(data)
 
     election = crud.get_election_by_uuid(db, election_uuid)
     return crud.get_voters_by_election_id(db=db, election_id=election.id, page=page, page_size=page_size)
@@ -97,9 +94,7 @@ def get_trustees_election(election_uuid: str, data: dict = None, db: Session = D
     }
     """
 
-    page = data.get("page", 0)
-    page_size = data.get("page_size", None)
-    page = page_size * page if page_size else None
+    page, page_size = paginate(data)
 
     election = crud.get_election_by_uuid(db=db, uuid=election_uuid)
     return crud.get_trustees_by_election_id(db=db, election_id=election.id, page=page, page_size=page_size)
@@ -131,9 +126,7 @@ def get_cast_votes(election_uuid: str, data: dict = {}, db: Session = Depends(ge
     
     """
 
-    page = data.get("page", 0)
-    page_size = data.get("page_size", None)
-    page = page_size * page if page_size else None
+    page, page_size = paginate(data)
 
     election = crud.get_election_by_uuid(db=db, uuid=election_uuid)
     voters = crud.get_voters_by_election_id(db=db, election_id=election.id, page=page, page_size=page_size)
