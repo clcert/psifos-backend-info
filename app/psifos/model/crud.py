@@ -25,6 +25,9 @@ def get_votes_by_ids(db: Session, voters_id: list):
 def get_election_cast_votes(db: Session, election_uuid: str):
     return db.query(models.CastVote).filter(models.CastVote)
 
+def get_cast_vote_by_hash(db: Session, election_uuid: str, hash_vote: str):
+    return db.query(models.CastVote).filter(models.Election.uuid == election_uuid, models.CastVote.vote_hash == hash_vote).first()
+
 def get_hashes_vote(db: Session, election_uuid: str, voters_id: list):
     return db.query(models.CastVote).filter(models.CastVote.voter_id.in_(voters_id)).with_entities(models.CastVote.vote_hash).all()
 

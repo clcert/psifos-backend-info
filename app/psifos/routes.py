@@ -133,6 +133,16 @@ def get_cast_votes(election_uuid: str, data: dict = {}, db: Session = Depends(ge
     voters_id = [v.id for v in voters]
     return crud.get_votes_by_ids(db=db, voters_id=voters_id)
 
+@api_router.post("/election/{election_uuid}/cast-vote", response_model=schemas.CastVoteOut, status_code=200)
+def get_vote_by_hash(election_uuid: str, data: dict = {}, db: Session = Depends(get_db)):
+
+    """
+    This route return a cast vote by its hash
+    
+    """
+    hash_vote = data.get("hash_vote", None)
+    return crud.get_cast_vote_by_hash(db=db, election_uuid=election_uuid, hash_vote=hash_vote)
+
 
 @api_router.post("/election/{election_uuid}/votes", response_model=schemas.UrnaOut, status_code=200)
 def get_votes(election_uuid: str, data: dict = {}, db: Session = Depends(get_db)):
