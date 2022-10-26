@@ -81,7 +81,7 @@ class CastVoteBase(BaseModel):
     Basic castvote schema.
     """
 
-    encrypted_vote: str | None
+    vote: str | None
 
 class CastVoteOut(CastVoteBase):
     """
@@ -90,13 +90,11 @@ class CastVoteOut(CastVoteBase):
 
     vote_hash: str | None
     vote_tinyhash: str | None
-    valid_cast_votes: int
     invalid_cast_votes: int
     cast_ip: str | None
     hash_cast_ip: str | None
     cast_at: datetime | None
     verified_at: datetime | None
-    invalidated_at: datetime | None
 
     class Config:
         orm_mode = True
