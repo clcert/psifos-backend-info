@@ -89,9 +89,6 @@ class CastVoteOut(CastVoteBase):
     """
 
     vote_hash: str | None
-    vote_tinyhash: str | None
-    invalid_cast_votes: int
-    cast_ip: str | None
     hash_cast_ip: str | None
     cast_at: datetime | None
     verified_at: datetime | None
