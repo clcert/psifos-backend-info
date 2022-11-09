@@ -16,7 +16,6 @@ from sqlalchemy import (
     Text,
     Enum,
     DateTime,
-    func,
 )
 
 
@@ -54,7 +53,6 @@ class Election(Base):
     encrypted_tally = Column(Text, nullable=True)
     encrypted_tally_hash = Column(Text, nullable=True)
 
-    decryptions = Column(Text, nullable=True)
     decryptions_uploaded = Column(Integer, default=0)
     result = Column(Text, nullable=True)
 
@@ -65,17 +63,17 @@ class Election(Base):
     voters_by_weight_end = Column(Text, nullable=True)
 
     # One-to-many relationships
-    voters = relationship("Voter", backref="psifos_election")
-    trustees = relationship("Trustee", backref="psifos_election")
-    sharedpoints = relationship("SharedPoint", backref="psifos_election")
-    audited_ballots = relationship("AuditedBallot", backref="psifos_election")
+    voters = relationship("Voter", cascade="all, delete", backref="psifos_election")
+    trustees = relationship("Trustee", cascade="all, delete", backref="psifos_election")
+    sharedpoints = relationship("SharedPoint", cascade="all, delete", backref="psifos_election")
+    audited_ballots = relationship("AuditedBallot", cascade="all, delete", backref="psifos_election")
 
 
 class Voter(Base):
     __tablename__ = "psifos_voter"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"))
+    election_id = Column(Integer, ForeignKey("psifos_election.id", onupdate="CASCADE", ondelete="CASCADE"))
     uuid = Column(String(50), nullable=False, unique=True)
 
     voter_login_id = Column(String(100), nullable=False)
@@ -83,16 +81,14 @@ class Voter(Base):
     voter_weight = Column(Integer, nullable=False)
 
     # One-to-one relationship
-    cast_vote = relationship(
-        "CastVote", cascade="delete", backref="psifos_voter", uselist=False
-    )
+    cast_vote = relationship("CastVote", cascade="all, delete", backref="psifos_voter", uselist=False)
 
 
 class CastVote(Base):
     __tablename__ = "psifos_cast_vote"
 
     id = Column(Integer, primary_key=True, index=True)
-    voter_id = Column(Integer, ForeignKey("psifos_voter.id"), unique=True)
+    voter_id = Column(Integer, ForeignKey("psifos_voter.id", onupdate="CASCADE", ondelete="CASCADE"), unique=True)
 
     vote = Column(Text, nullable=True)
     vote_hash = Column(String(500), nullable=True)
@@ -104,26 +100,28 @@ class CastVote(Base):
     cast_ip = Column(Text, nullable=True)
     hash_cast_ip = Column(String(500), nullable=True)
 
-    cast_at = Column(DateTime, default=func.now(), nullable=True)
+    cast_at = Column(DateTime, nullable=True)
 
 
 class AuditedBallot(Base):
     __tablename__ = "psifos_audited_ballot"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"))
+    election_id = Column(Integer, ForeignKey("psifos_election.id", onupdate="CASCADE", ondelete="CASCADE"))
 
     raw_vote = Column(Text)
     vote_hash = Column(String(500))
-    added_at = Column(DateTime, default=func.now())
+    added_at = Column(DateTime)
 
 
 class Trustee(Base):
     __tablename__ = "psifos_trustee"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"))
-    trustee_id = Column(Integer, nullable=False)
+    election_id = Column(Integer, ForeignKey("psifos_election.id", onupdate="CASCADE", ondelete="CASCADE"))
+    trustee_id = Column(
+        Integer, nullable=False
+    )  # TODO: rename to index for deambiguation with trustee_id func. param at await crud.py
     uuid = Column(String(50), nullable=False, unique=True)
 
     name = Column(String(200), nullable=False)
@@ -144,13 +142,32 @@ class Trustee(Base):
     coefficients = Column(Text, nullable=True)
     acknowledgements = Column(Text, nullable=True)
 
+    def get_decryptions(self):
+        if self.decryptions:
+            return self.decryptions.instances
+        return None
+
 
 class SharedPoint(Base):
     __tablename__ = "psifos_shared_point"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"))
+    election_id = Column(Integer, ForeignKey("psifos_election.id", onupdate="CASCADE", ondelete="CASCADE"))
 
     sender = Column(Integer, nullable=False)
     recipient = Column(Integer, nullable=False)
     point = Column(Text, nullable=True)
+
+
+class ElectionLog(Base):
+    __tablename__ = "election_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    election_id = Column(Integer, ForeignKey("psifos_election.id", onupdate="CASCADE", ondelete="CASCADE"))
+    
+    log_level = Column(String(200), nullable=False)
+    
+    event = Column(String(200), nullable=False)
+    event_params = Column(String(200), nullable=False)
+    
+    created_at = Column(String(200), nullable=False)

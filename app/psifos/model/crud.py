@@ -5,57 +5,67 @@ CRUD utils for Psifos
 01/08/2022
 """
 
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
-from app.psifos.model import models
+from app.psifos.crypto.sharedpoint import Point
+from app.psifos.model import models, schemas
+from sqlalchemy import select, update, delete
+from sqlalchemy.orm import selectinload
+from app.database import db_handler
 
+
+ELECTION_QUERY_OPTIONS = [
+    selectinload(models.Election.voters).selectinload(
+        models.Voter.cast_vote
+    ),
+    selectinload(models.Election.trustees),
+    selectinload(models.Election.sharedpoints),
+    selectinload(models.Election.audited_ballots)
+]
+
+VOTER_QUERY_OPTIONS = selectinload(
+    models.Voter.cast_vote
+)
 
 # ----- Voter CRUD Utils -----
 
 
-def get_voters_by_election_id(db: Session, election_id: int, page=0, page_size=None):
-    return (
-        db.query(models.Voter)
-        .filter(models.Voter.election_id == election_id)
-        .offset(page)
-        .limit(page_size)
-        .all()
+async def get_voters_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
+    query = select(models.Voter).where(
+        models.Voter.election_id == election_id
+    ).offset(page).limit(page_size).options(
+        VOTER_QUERY_OPTIONS
     )
 
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
 
-def get_votes_by_ids(db: Session, voters_id: list):
-    return (
-        db.query(models.CastVote).filter(models.CastVote.voter_id.in_(voters_id)).all()
-    )
+
+async def get_votes_by_ids(session: Session | AsyncSession, voters_id: list):
+    query = select(models.CastVote).where(models.CastVote.voter_id.in_(voters_id))
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
 
 
 # ----- CastVote CRUD Utils -----
 
-
-def get_election_cast_votes(db: Session, election_uuid: str):
-    return db.query(models.CastVote).filter(models.CastVote)
-
-
-def get_cast_vote_by_hash(db: Session, election_uuid: str, hash_vote: str):
-    return (
-        db.query(models.CastVote)
-        .join(models.Voter, models.Voter.id == models.CastVote.voter_id)
-        .join(models.Election, models.Election.id == models.Voter.election_id)
-        .filter(
-            models.CastVote.vote_hash == hash_vote,
-            models.Election.uuid == election_uuid,
-        )
-        .first()
+async def get_cast_vote_by_hash(session: Session | AsyncSession, hash_vote: str):
+    query = select(models.CastVote).where(
+        models.CastVote.vote_hash == hash_vote
     )
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()
 
 
-def get_hashes_vote(db: Session, election_uuid: str, voters_id: list):
-    return (
-        db.query(models.CastVote)
-        .filter(models.CastVote.voter_id.in_(voters_id))
-        .with_entities(models.CastVote.vote_hash)
-        .all()
-    )
+async def get_hashes_vote(session: Session | AsyncSession, voters_id: list):
+    query = select(models.CastVote).where(
+        models.CastVote.voter_id.in_(voters_id)
+    ).with_entities(models.CastVote.vote_hash)
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
+    
 
 
 # ----- AuditedBallot CRUD Utils -----
@@ -64,19 +74,20 @@ def get_hashes_vote(db: Session, election_uuid: str, voters_id: list):
 # ----- Trustee CRUD Utils -----
 
 
-def get_trustee_by_uuid(db: Session, trustee_uuid: str):
-    return db.query(models.Trustee).filter(models.Trustee.uuid == trustee_uuid).first()
+async def get_trustee_by_uuid(session: Session | AsyncSession, trustee_uuid: str):
+    query = select(models.Trustee).where(models.Trustee.uuid == trustee_uuid)
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()
 
 
-def get_trustees_by_election_id(db: Session, election_id: int, page=0, page_size=None):
-    return (
-        db.query(models.Trustee)
-        .filter(models.Trustee.election_id == election_id)
-        .offset(page)
-        .limit(page_size)
-        .all()
-    )
+async def get_trustees_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
+    query = select(models.Trustee).where(
+        models.Trustee.election_id == election_id
+    ).offset(page).limit(page_size)
 
+    result = await db_handler.execute(session, query)
+    
+    return result.scalars().all()
 
 # ----- SharedPoint CRUD Utils -----
 
@@ -84,17 +95,32 @@ def get_trustees_by_election_id(db: Session, election_id: int, page=0, page_size
 # ----- Election CRUD Utils -----
 
 
-def get_elections(db: Session, page: int = 0, page_size: int = None):
-    return db.query(models.Election).offset(page).limit(page_size).all()
+async def get_elections(session: Session | AsyncSession, page: int = 0, page_size: int = None):
+    query = select(models.Election).offset(page).limit(page_size).options(
+        ELECTION_QUERY_OPTIONS
+    )
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
 
 
-def get_election_by_short_name(db: Session, short_name: str):
-    return (
-        db.query(models.Election)
-        .filter(models.Election.short_name == short_name)
-        .first()
+
+async def get_election_by_short_name(session: Session | AsyncSession, short_name: str):
+    query = select(models.Election).where(
+        models.Election.short_name == short_name
+    ).options(
+        ELECTION_QUERY_OPTIONS
     )
 
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
+    
 
-def get_election_by_uuid(db: Session, uuid: str):
-    return db.query(models.Election).filter(models.Election.uuid == uuid).first()
+
+async def get_election_by_uuid(session: Session | AsyncSession, uuid: str):
+    query = select(models.Election).where(
+        models.Election.uuid == uuid
+    ).options(
+        ELECTION_QUERY_OPTIONS
+    )
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()

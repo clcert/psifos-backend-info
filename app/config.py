@@ -7,6 +7,8 @@ DATABASE_NAME = os.environ.get("DATABASE_NAME")
 
 SECRET_KEY: str = os.environ.get("SECRET_KEY")
 
+USE_ASYNC_ENGINE = bool(int(os.environ.get("USE_ASYNC_ENGINE", False)))
+
 ORIGINS: list = [
     "*"
 ]
