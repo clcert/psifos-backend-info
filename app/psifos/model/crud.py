@@ -7,11 +7,9 @@ CRUD utils for Psifos
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 
-from app.psifos.crypto.sharedpoint import Point
-from app.psifos.model import models, schemas
-from sqlalchemy import select, update, delete
+from app.psifos.model import models
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.database import db_handler
 
@@ -97,7 +95,7 @@ async def get_trustees_by_election_id(session: Session | AsyncSession, election_
 
 async def get_elections(session: Session | AsyncSession, page: int = 0, page_size: int = None):
     query = select(models.Election).offset(page).limit(page_size).options(
-        ELECTION_QUERY_OPTIONS
+        *ELECTION_QUERY_OPTIONS
     )
     result = await db_handler.execute(session, query)
     return result.scalars().all()
@@ -108,7 +106,7 @@ async def get_election_by_short_name(session: Session | AsyncSession, short_name
     query = select(models.Election).where(
         models.Election.short_name == short_name
     ).options(
-        ELECTION_QUERY_OPTIONS
+        *ELECTION_QUERY_OPTIONS
     )
 
     result = await db_handler.execute(session, query)
@@ -120,7 +118,7 @@ async def get_election_by_uuid(session: Session | AsyncSession, uuid: str):
     query = select(models.Election).where(
         models.Election.uuid == uuid
     ).options(
-        ELECTION_QUERY_OPTIONS
+        *ELECTION_QUERY_OPTIONS
     )
     result = await db_handler.execute(session, query)
     return result.scalars().first()

@@ -28,7 +28,7 @@ async def get_elections(data: dict = {}, session: Session | AsyncSession = Depen
     """
 
     page, page_size = paginate(data)
-
+    print("uwu")
     return await crud.get_elections(session=session, page=page, page_size=page_size)
 
  
@@ -54,8 +54,8 @@ async def get_election_results(election_uuid: str, session: Session | AsyncSessi
     This route delivers the results of an election
     
     """
-
-    return await crud.get_election_by_uuid(session=session, uuid=election_uuid).result
+    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    return election.result
 
 
 
@@ -143,7 +143,7 @@ async def get_vote_by_hash(election_uuid: str, hash_vote, session: Session | Asy
     
     """
     hash_vote = unquote(unquote(hash_vote))
-    return await crud.get_cast_vote_by_hash(session=session, election_uuid=election_uuid, hash_vote=hash_vote)
+    return await crud.get_cast_vote_by_hash(session=session, hash_vote=hash_vote)
 
 
 @api_router.post("/election/{election_uuid}/votes", response_model=schemas.UrnaOut, status_code=200)
@@ -159,7 +159,7 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
 
 
     page = data.get("page", 0)
-    page_size = data.get("page_size", None)
+    page_size = data.get("page_size", 50)
     page = page_size * page if page_size else None
     vote_hash = data.get("vote_hash", "")
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
@@ -179,5 +179,8 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
 
     voters = [schemas.VoterOut.from_orm(v) for v in voters_page]
     cast_votes = [schemas.CastVoteOut.from_orm(c) for c in cast_votes]
+
+    print(voters)
+    print(cast_votes)
 
     return schemas.UrnaOut(voters=voters, cast_vote=cast_votes, position=page)
