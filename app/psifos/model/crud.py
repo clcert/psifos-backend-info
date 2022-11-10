@@ -122,3 +122,13 @@ async def get_election_by_uuid(session: Session | AsyncSession, uuid: str):
     )
     result = await db_handler.execute(session, query)
     return result.scalars().first()
+
+# ----- ElectionLogs CRUD Utils -----
+
+async def get_election_logs(session: Session | AsyncSession, election_id: int):
+
+    query = select(models.ElectionLog).where(
+        models.ElectionLog.election_id == election_id
+    )
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()

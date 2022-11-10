@@ -193,3 +193,14 @@ class UrnaOut(BaseModel):
     position: int
     class Config:
         orm_mode = True
+
+class ElectionLogOut(BaseModel):
+
+    election_id: int
+    log_level: str 
+    event: str 
+    event_params: str 
+    created_at: str 
+
+    class Config:
+        orm_mode = True
