@@ -5,6 +5,7 @@ from app.psifos.model import crud, schemas
 from sqlalchemy.orm import Session
 from urllib.parse import unquote
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.psifos.model.enums import ElectionPublicEventEnum
 
 # api_router = APIRouter(prefix="/psifos/api/public")
 api_router = APIRouter()
@@ -28,7 +29,6 @@ async def get_elections(data: dict = {}, session: Session | AsyncSession = Depen
     """
 
     page, page_size = paginate(data)
-    print("uwu")
     return await crud.get_elections(session=session, page=page, page_size=page_size)
 
  
@@ -186,5 +186,7 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
 async def election_logs(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
 
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
-    return await crud.get_election_logs(session=session, election_id=election.id)
+    election_logs = await crud.get_election_logs(session=session, election_id=election.id)
+    election_logs = list(filter(lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
+    return election_logs
     
