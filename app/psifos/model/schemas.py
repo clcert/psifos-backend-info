@@ -91,7 +91,6 @@ class CastVoteOut(CastVoteBase):
     vote_hash: str | None
     hash_cast_ip: str | None
     cast_at: datetime | None
-    verified_at: datetime | None
 
     class Config:
         orm_mode = True

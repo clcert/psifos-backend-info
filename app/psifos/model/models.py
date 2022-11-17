@@ -21,6 +21,7 @@ from sqlalchemy import (
 
 from app.psifos.model.enums import ElectionStatusEnum, ElectionTypeEnum
 from app.database import Base
+from app.psifos import utils
 
 
 class Election(Base):
@@ -80,6 +81,9 @@ class Voter(Base):
     voter_name = Column(String(200), nullable=False)
     voter_weight = Column(Integer, nullable=False)
 
+    valid_cast_votes = Column(Integer, default=0)
+    invalid_cast_votes = Column(Integer, default=0)
+    
     # One-to-one relationship
     cast_vote = relationship("CastVote", cascade="all, delete", backref="psifos_voter", uselist=False)
 
@@ -90,17 +94,16 @@ class CastVote(Base):
     id = Column(Integer, primary_key=True, index=True)
     voter_id = Column(Integer, ForeignKey("psifos_voter.id", onupdate="CASCADE", ondelete="CASCADE"), unique=True)
 
-    vote = Column(Text, nullable=True)
-    vote_hash = Column(String(500), nullable=True)
-    vote_tinyhash = Column(String(500), nullable=True)
+    vote = Column(Text, nullable=False)
+    vote_hash = Column(String(500), nullable=False)
+    # vote_tinyhash = Column(String(500), nullable=False)
 
-    valid_cast_votes = Column(Integer, default=0)
-    invalid_cast_votes = Column(Integer, default=0)
+    is_valid = Column(Boolean, nullable=False)
+    
+    cast_ip = Column(Text, nullable=False)
+    cast_ip_hash = Column(String(500), nullable=False)
 
-    cast_ip = Column(Text, nullable=True)
-    hash_cast_ip = Column(String(500), nullable=True)
-
-    cast_at = Column(DateTime, nullable=True)
+    cast_at = Column(DateTime, nullable=False)
 
 
 class AuditedBallot(Base):
@@ -111,7 +114,7 @@ class AuditedBallot(Base):
 
     raw_vote = Column(Text)
     vote_hash = Column(String(500))
-    added_at = Column(DateTime)
+    added_at = Column(DateTime, default=utils.tz_now())
 
 
 class Trustee(Base):
@@ -141,11 +144,6 @@ class Trustee(Base):
     certificate = Column(Text, nullable=True)
     coefficients = Column(Text, nullable=True)
     acknowledgements = Column(Text, nullable=True)
-
-    def get_decryptions(self):
-        if self.decryptions:
-            return self.decryptions.instances
-        return None
 
 
 class SharedPoint(Base):

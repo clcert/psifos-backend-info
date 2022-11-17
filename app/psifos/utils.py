@@ -5,7 +5,10 @@ Utilities for Psifos.
 """
 
 import json
+import pytz
 
+from datetime import datetime
+from app.config import TIMEZONE
 from functools import reduce
 
 # -- JSON manipulation --
@@ -23,12 +26,15 @@ def from_json(value):
         try:
             return json.loads(value)
         except Exception as e:
-            raise Exception("psifos.utils error: in from_json, value is not JSON parseable") from e
+            raise Exception(
+                "psifos.utils error: in from_json, value is not JSON parseable"
+            ) from e
 
     return value
 
 
 # -- Election utils --
+
 
 def generate_election_pk(trustees):
     a_combined_pk = trustees[0].coefficients.instances[0].coefficient
@@ -42,6 +48,7 @@ def generate_election_pk(trustees):
 
 
 # -- CastVote validation --
+
 
 def do_cast_vote_checks(request, election, voter):
     if not election.voting_has_started():
@@ -57,6 +64,12 @@ def do_cast_vote_checks(request, election, voter):
         if voter is None:
             return False, "Error al enviar el voto: votante no encontrado"
     return True, None
+
+
+# -- Datetime --
+def tz_now():
+    tz = pytz.timezone(TIMEZONE)
+    return datetime.now(tz)
 
 
 def paginate(data_json: dict):
