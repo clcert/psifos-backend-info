@@ -118,6 +118,7 @@ class VoterOut(VoterBase):
     voter_login_id: str
     voter_name: str
     voter_weight: int
+    cast_vote: object | None
 
     class Config:
         orm_mode = True
@@ -188,7 +189,6 @@ class TrusteeHome(BaseModel):
 
 class UrnaOut(BaseModel):
     voters: list[VoterOut] = []
-    cast_vote: list[CastVoteOut] = []
     position: int
     class Config:
         orm_mode = True

@@ -31,7 +31,7 @@ VOTER_QUERY_OPTIONS = selectinload(
 
 
 async def get_voters_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
-    query = select(models.Voter).where(
+    query = select(models.Voter).outerjoin(models.CastVote).where(
         models.Voter.election_id == election_id
     ).offset(page).limit(page_size).options(
         VOTER_QUERY_OPTIONS

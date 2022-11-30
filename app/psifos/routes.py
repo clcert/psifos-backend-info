@@ -174,13 +174,9 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
             page = index_hash - (index_hash % page_size)
 
     voters_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
-    voters_id = [v.id for v in voters_page]
-    cast_votes = await crud.get_votes_by_ids(session=session, voters_id=voters_id)
-
     voters = [schemas.VoterOut.from_orm(v) for v in voters_page]
-    cast_votes = [schemas.CastVoteOut.from_orm(c) for c in cast_votes]
 
-    return schemas.UrnaOut(voters=voters, cast_vote=cast_votes, position=page)
+    return schemas.UrnaOut(voters=voters, position=page)
 
 @api_router.get("/election/{election_uuid}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
 async def election_logs(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
