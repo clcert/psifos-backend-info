@@ -141,6 +141,7 @@ class ElectionBase(BaseModel):
     randomize_answer_order: bool | None
     private_p: bool | None
     normalization: bool | None
+    include_blank_null_vote: bool | None
 
 
 
