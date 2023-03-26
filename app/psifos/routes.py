@@ -164,8 +164,8 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
     vote_hash = data.get("vote_hash", "")
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
 
+    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
     if vote_hash != "":
-        voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
         voters_id = [v.id for v in voters]
         hash_votes = await crud.get_hashes_vote(session=session, voters_id=voters_id)
 
@@ -174,9 +174,11 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
             page = index_hash - (index_hash % page_size)
 
     voters_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
-    voters = [schemas.VoterOut.from_orm(v) for v in voters_page]
+    voters_next_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page + 1, page_size=page_size)
+    voters_page = [schemas.VoterOut.from_orm(v) for v in voters_page]
+    more_votes = len(voters_next_page) != 0
 
-    return schemas.UrnaOut(voters=voters, position=page)
+    return schemas.UrnaOut(voters=voters_page, position=page, more_votes=more_votes, total_votes=len(voters))
 
 @api_router.get("/election/{election_uuid}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
 async def election_logs(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):

@@ -31,9 +31,10 @@ VOTER_QUERY_OPTIONS = selectinload(
 
 
 async def get_voters_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
+    offset_value = page*page_size if page_size else None
     query = select(models.Voter).outerjoin(models.CastVote).where(
         models.Voter.election_id == election_id
-    ).offset(page).limit(page_size).options(
+    ).offset(offset_value).limit(page_size).options(
         VOTER_QUERY_OPTIONS
     )
 
@@ -78,10 +79,11 @@ async def get_trustee_by_uuid(session: Session | AsyncSession, trustee_uuid: str
     return result.scalars().first()
 
 
-async def get_trustees_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
+async def get_trustees_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=0):
+    offset_value = page*page_size if page_size else None
     query = select(models.Trustee).where(
         models.Trustee.election_id == election_id
-    ).offset(page).limit(page_size)
+    ).offset(offset_value).limit(page_size)
 
     result = await db_handler.execute(session, query)
     
@@ -93,8 +95,9 @@ async def get_trustees_by_election_id(session: Session | AsyncSession, election_
 # ----- Election CRUD Utils -----
 
 
-async def get_elections(session: Session | AsyncSession, page: int = 0, page_size: int = None):
-    query = select(models.Election).offset(page).limit(page_size).options(
+async def get_elections(session: Session | AsyncSession, page: int = 0, page_size: int = 0):
+    offset_value = page*page_size if page_size else None
+    query = select(models.Election).offset(offset_value).limit(page_size).options(
         *ELECTION_QUERY_OPTIONS
     )
     result = await db_handler.execute(session, query)

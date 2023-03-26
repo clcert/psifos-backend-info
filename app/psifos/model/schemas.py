@@ -190,6 +190,8 @@ class TrusteeHome(BaseModel):
 class UrnaOut(BaseModel):
     voters: list[VoterOut] = []
     position: int
+    more_votes: bool
+    total_votes: int
     class Config:
         orm_mode = True
 
