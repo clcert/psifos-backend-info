@@ -1,4 +1,4 @@
-from app.psifos.utils import paginate
+from app.psifos.utils import paginate, tz_now
 from fastapi import APIRouter, Depends
 from app.dependencies import get_session
 from app.psifos.model import crud, schemas
@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 from urllib.parse import unquote
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.psifos.model.enums import ElectionPublicEventEnum
+from datetime import timedelta
+
+import datetime
 
 # api_router = APIRouter(prefix="/psifos/api/public")
 api_router = APIRouter()
@@ -58,6 +61,49 @@ async def get_election_results(election_uuid: str, session: Session | AsyncSessi
     return election.result
 
 
+@api_router.get("/get-election-stats/{election_uuid}", status_code=200)
+async def get_election_stats(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    Route for getting the stats of a specific election.
+    """
+    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid) 
+    return {
+        "num_casted_votes": await crud.get_num_casted_votes(
+            session=session,
+            election_id=election.id
+        ),
+        "total_voters": election.total_voters,
+        "status": election.election_status,
+        "name": election.short_name
+    }
+
+@api_router.post("/{election_uuid}/count-dates", status_code=200)
+async def get_count_votes_by_date(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
+    """
+    Return the number of votes per deltaTime from the start of the election until it ends
+
+    """
+    
+    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid) 
+
+    if election.election_status == "Setting up":
+        return {}
+
+    date_init = election.voting_started_at
+    date_end = election.voting_ended_at if election.voting_ended_at else tz_now()
+    date_end = datetime.datetime(year=date_end.year, month=date_end.month, day=date_end.day, hour=date_end.hour, minute=date_end.minute, second=date_end.second)
+    
+    delta_minutes = data.get("minutes", 60)
+    count_cast_votes = {}
+
+    while date_init <= date_end:
+
+        date_delta = date_init + timedelta(minutes=delta_minutes)
+        dates = await crud.count_cast_vote_by_date(session=session, election_id=election.id, init_date=date_init, end_date=date_delta)
+        count_cast_votes[str(date_init)] = len(dates)
+        date_init = date_delta
+
+    return count_cast_votes
 
 #----- Voters routes -----
 

@@ -12,6 +12,7 @@ from app.psifos.model import models
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.database import db_handler
+from sqlalchemy import and_
 
 
 ELECTION_QUERY_OPTIONS = [
@@ -135,3 +136,17 @@ async def get_election_logs(session: Session | AsyncSession, election_id: int):
     )
     result = await db_handler.execute(session, query)
     return result.scalars().all()
+
+async def get_num_casted_votes(session: Session | AsyncSession, election_id: int):
+    voters = await get_voters_by_election_id(session=session, election_id=election_id)
+    return len([v for v in voters if v.valid_cast_votes >= 1])
+
+async def count_cast_vote_by_date(session: Session | AsyncSession, init_date, end_date, election_id: int):
+                    
+    query = select(models.CastVote.cast_at).join(
+        models.Voter, models.Voter.id == models.CastVote.voter_id).where(
+            models.Voter.election_id == election_id,
+            and_(models.CastVote.cast_at >= init_date, 
+            models.CastVote.cast_at <= end_date))
+    result = await db_handler.execute(session, query)
+    return result.all()
