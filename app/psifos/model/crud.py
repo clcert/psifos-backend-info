@@ -42,6 +42,17 @@ async def get_voters_by_election_id(session: Session | AsyncSession, election_id
     result = await db_handler.execute(session, query)
     return result.scalars().all()
 
+async def get_voters_with_valid_vote(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
+    offset_value = page*page_size if page_size else None
+    query = select(models.Voter).outerjoin(models.CastVote).where(
+        models.Voter.election_id == election_id, and_(models.Voter.valid_cast_votes != 0)
+    ).offset(offset_value).limit(page_size).options(
+        VOTER_QUERY_OPTIONS
+    )
+
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
+
 
 async def get_votes_by_ids(session: Session | AsyncSession, voters_id: list):
     query = select(models.CastVote).where(models.CastVote.voter_id.in_(voters_id))

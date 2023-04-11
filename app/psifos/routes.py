@@ -210,7 +210,7 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
     vote_hash = data.get("vote_hash", "")
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
 
-    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
+    voters = await crud.get_voters_with_valid_vote(session=session, election_id=election.id)
     if vote_hash != "":
         voters_id = [v.id for v in voters]
         hash_votes = await crud.get_hashes_vote(session=session, voters_id=voters_id)
@@ -219,8 +219,8 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
             index_hash = hash_votes.index((vote_hash,))
             page = index_hash - (index_hash % page_size)
 
-    voters_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
-    voters_next_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page + 1, page_size=page_size)
+    voters_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page, page_size=page_size)
+    voters_next_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page + 1, page_size=page_size)
     voters_page = [schemas.VoterOut.from_orm(v) for v in voters_page]
     more_votes = len(voters_next_page) != 0
 
