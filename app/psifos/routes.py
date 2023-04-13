@@ -9,11 +9,13 @@ from app.psifos.model.enums import ElectionPublicEventEnum
 from datetime import timedelta
 
 import datetime
+import json
 
 # api_router = APIRouter(prefix="/psifos/api/public")
 api_router = APIRouter()
 
-#----- Election routes -----
+# ----- Election routes -----
+
 
 @api_router.post("/elections", response_model=list[schemas.ElectionOut], status_code=200)
 async def get_elections(data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
@@ -28,13 +30,13 @@ async def get_elections(data: dict = {}, session: Session | AsyncSession = Depen
       page: The page number you want to get
       page_size: Number of elements to display per page
     }
-    
+
     """
 
     page, page_size = paginate(data)
     return await crud.get_elections(session=session, page=page, page_size=page_size)
 
- 
+
 @api_router.get("/election/{election_uuid}", response_model=schemas.ElectionOut, status_code=200)
 async def get_election(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
 
@@ -42,7 +44,7 @@ async def get_election(election_uuid: str, session: Session | AsyncSession = Dep
     GET
 
     This route delivers all public data of an election
-    
+
     """
 
     return await crud.get_election_by_uuid(session=session, uuid=election_uuid)
@@ -50,12 +52,12 @@ async def get_election(election_uuid: str, session: Session | AsyncSession = Dep
 
 @api_router.get("/election/{election_uuid}/result", status_code=200)
 async def get_election_results(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
-    
+
     """
     GET
 
     This route delivers the results of an election
-    
+
     """
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
     return election.result
@@ -66,7 +68,7 @@ async def get_election_stats(election_uuid: str, session: Session | AsyncSession
     """
     Route for getting the stats of a specific election.
     """
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid) 
+    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
     return {
         "num_casted_votes": await crud.get_num_casted_votes(
             session=session,
@@ -77,22 +79,24 @@ async def get_election_stats(election_uuid: str, session: Session | AsyncSession
         "name": election.short_name
     }
 
+
 @api_router.post("/{election_uuid}/count-dates", status_code=200)
 async def get_count_votes_by_date(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
     """
     Return the number of votes per deltaTime from the start of the election until it ends
 
     """
-    
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid) 
+
+    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
 
     if election.election_status == "Setting up":
         return {}
 
     date_init = election.voting_started_at
     date_end = election.voting_ended_at if election.voting_ended_at else tz_now()
-    date_end = datetime.datetime(year=date_end.year, month=date_end.month, day=date_end.day, hour=date_end.hour, minute=date_end.minute, second=date_end.second)
-    
+    date_end = datetime.datetime(year=date_end.year, month=date_end.month, day=date_end.day,
+                                 hour=date_end.hour, minute=date_end.minute, second=date_end.second)
+
     delta_minutes = data.get("minutes", 60)
     count_cast_votes = {}
 
@@ -105,7 +109,27 @@ async def get_count_votes_by_date(election_uuid: str, data: dict = {}, session: 
 
     return count_cast_votes
 
-#----- Voters routes -----
+
+@api_router.get("/{election_uuid}/resume", status_code=200)
+async def resume(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    Route for get a resume election
+    """
+    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
+
+    voters = [v for v in voters if v.valid_cast_votes >= 1]
+    normalized_weights = [v.voter_weight / election.max_weight for v in voters]
+    votes_by_weight = json.dumps({str(w): normalized_weights.count(w) for w in normalized_weights})
+
+    return {
+        "weights_init": election.voters_by_weight_init,
+        "weights_election": votes_by_weight,
+        "weights_end": election.voters_by_weight_end
+    }
+
+# ----- Voters routes -----
+
 
 @api_router.post("/election/{election_uuid}/voters", response_model=list[schemas.VoterOut], status_code=200)
 async def get_voters(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
@@ -126,7 +150,7 @@ async def get_voters(election_uuid: str, data: dict = {}, session: Session | Asy
     return await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
 
 
-#----- Trustee routes -----
+# ----- Trustee routes -----
 
 @api_router.post("/election/{election_uuid}/trustees", status_code=200)
 async def get_trustees_election(election_uuid: str, data: dict = None, session: Session | AsyncSession = Depends(get_session)):
@@ -147,6 +171,7 @@ async def get_trustees_election(election_uuid: str, data: dict = None, session: 
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
     return await crud.get_trustees_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
 
+
 @api_router.get("/trustee/{trustee_uuid}", response_model=schemas.TrusteeOut, status_code=200)
 async def get_trustee(trustee_uuid: str, session: Session | AsyncSession = Depends(get_session)):
 
@@ -158,7 +183,7 @@ async def get_trustee(trustee_uuid: str, session: Session | AsyncSession = Depen
     return await crud.get_trustee_by_uuid(session=session, trustee_uuid=trustee_uuid)
 
 
-#----- CastVote routes -----
+# ----- CastVote routes -----
 
 @api_router.post("/election/{election_uuid}/cast-votes", response_model=list[schemas.CastVoteOut], status_code=200)
 async def get_cast_votes(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
@@ -171,7 +196,7 @@ async def get_cast_votes(election_uuid: str, data: dict = {}, session: Session |
       page: The page number you want to get
       page_size: Number of elements to display per page
     }
-    
+
     """
 
     page, page_size = paginate(data)
@@ -181,12 +206,13 @@ async def get_cast_votes(election_uuid: str, data: dict = {}, session: Session |
     voters_id = [v.id for v in voters]
     return await crud.get_votes_by_ids(session=session, voters_id=voters_id)
 
+
 @api_router.get("/election/{election_uuid}/cast-vote/{hash_vote:path}", response_model=schemas.CastVoteOut, status_code=200)
 async def get_vote_by_hash(election_uuid: str, hash_vote, session: Session | AsyncSession = Depends(get_session)):
 
     """
     This route return a cast vote by its hash
-    
+
     """
     hash_vote = unquote(unquote(hash_vote))
     return await crud.get_cast_vote_by_hash(session=session, hash_vote=hash_vote)
@@ -200,9 +226,8 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
 
     This route delivers a list of voters according to the hash of the corresponding vote,
     it is used to display the electronic ballot box
-    
-    """
 
+    """
 
     page = data.get("page", 0)
     page_size = data.get("page_size", 50)
@@ -226,11 +251,12 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
 
     return schemas.UrnaOut(voters=voters_page, position=page, more_votes=more_votes, total_votes=len(voters))
 
+
 @api_router.get("/election/{election_uuid}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
 async def election_logs(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
 
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
     election_logs = await crud.get_election_logs(session=session, election_id=election.id)
-    election_logs = list(filter(lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
+    election_logs = list(filter(
+        lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
     return election_logs
-    
