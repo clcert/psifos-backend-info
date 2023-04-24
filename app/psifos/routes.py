@@ -2,6 +2,7 @@ from app.psifos.utils import paginate, tz_now
 from fastapi import APIRouter, Depends
 from app.dependencies import get_session
 from app.psifos.model import crud, schemas
+from app.psifos.model import bundle_schemas
 from sqlalchemy.orm import Session
 from urllib.parse import unquote
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -120,7 +121,8 @@ async def resume(election_uuid: str, session: Session | AsyncSession = Depends(g
 
     voters = [v for v in voters if v.valid_cast_votes >= 1]
     normalized_weights = [v.voter_weight / election.max_weight for v in voters]
-    votes_by_weight = json.dumps({str(w): normalized_weights.count(w) for w in normalized_weights})
+    votes_by_weight = json.dumps(
+        {str(w): normalized_weights.count(w) for w in normalized_weights})
 
     return {
         "weights_init": election.voters_by_weight_init,
@@ -254,9 +256,43 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
 
 @api_router.get("/election/{election_uuid}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
 async def election_logs(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    GET
+
+    Is used to obtain the different logs of an election
+
+    """
 
     election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
     election_logs = await crud.get_election_logs(session=session, election_id=election.id)
     election_logs = list(filter(
         lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
     return election_logs
+
+
+@api_router.get("/election/{election_uuid}/bundle-file", response_model=bundle_schemas.Bundle, status_code=200)
+async def election_bundle_file(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    GET
+
+    It is used to get all the necessary values ​​for the bundle file.
+
+    """
+
+    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    voters = [bundle_schemas.VoterBundle.from_orm(v) for v in election.voters]
+    voters_id = [v.id for v in election.voters]
+
+    # Get votes by uuid and voter uuid
+    votes = await crud.get_votes_by_ids(session=session, voters_id=voters_id)
+    votes = [bundle_schemas.VoteBundle.from_orm(v) for v in votes]
+    votes = list(map(lambda v: {"vote": v.vote, "vote_hash": v.vote_hash,
+                 "cast_at": v.cast_at, "voter_uuid": v.psifos_voter.uuid}, votes))
+
+    trustees = [bundle_schemas.TrusteeBundle.from_orm(
+        t) for t in election.trustees]
+    return bundle_schemas.Bundle(election=bundle_schemas.ElectionBundle.from_orm(election),
+                                 voters=voters,
+                                 votes=votes,
+                                 result=election.result,
+                                 trustees=trustees)
