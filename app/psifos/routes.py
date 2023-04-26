@@ -279,7 +279,7 @@ async def election_bundle_file(short_name: str, session: Session | AsyncSession 
 
     """
 
-    election = await crud.get_election_by_short_name(session=session, uuid=short_name)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     voters = [bundle_schemas.VoterBundle.from_orm(v) for v in election.voters]
     voters_id = [v.id for v in election.voters]
 
