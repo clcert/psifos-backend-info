@@ -38,8 +38,8 @@ async def get_elections(data: dict = {}, session: Session | AsyncSession = Depen
     return await crud.get_elections(session=session, page=page, page_size=page_size)
 
 
-@api_router.get("/election/{election_uuid}", response_model=schemas.ElectionOut, status_code=200)
-async def get_election(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+@api_router.get("/election/{short_name}", response_model=schemas.ElectionOut, status_code=200)
+async def get_election(short_name: str, session: Session | AsyncSession = Depends(get_session)):
 
     """
     GET
@@ -48,11 +48,11 @@ async def get_election(election_uuid: str, session: Session | AsyncSession = Dep
 
     """
 
-    return await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    return await crud.get_election_by_short_name(session=session, short_name=short_name)
 
 
-@api_router.get("/election/{election_uuid}/result", status_code=200)
-async def get_election_results(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+@api_router.get("/election/{short_name}/result", status_code=200)
+async def get_election_results(short_name: str, session: Session | AsyncSession = Depends(get_session)):
 
     """
     GET
@@ -60,16 +60,16 @@ async def get_election_results(election_uuid: str, session: Session | AsyncSessi
     This route delivers the results of an election
 
     """
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     return election.result
 
 
-@api_router.get("/get-election-stats/{election_uuid}", status_code=200)
-async def get_election_stats(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+@api_router.get("/get-election-stats/{short_name}", status_code=200)
+async def get_election_stats(short_name: str, session: Session | AsyncSession = Depends(get_session)):
     """
     Route for getting the stats of a specific election.
     """
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     return {
         "num_casted_votes": await crud.get_num_casted_votes(
             session=session,
@@ -81,14 +81,14 @@ async def get_election_stats(election_uuid: str, session: Session | AsyncSession
     }
 
 
-@api_router.post("/{election_uuid}/count-dates", status_code=200)
-async def get_count_votes_by_date(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
+@api_router.post("/{short_name}/count-dates", status_code=200)
+async def get_count_votes_by_date(short_name: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
     """
     Return the number of votes per deltaTime from the start of the election until it ends
 
     """
 
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
 
     if election.election_status == "Setting up":
         return {}
@@ -111,12 +111,12 @@ async def get_count_votes_by_date(election_uuid: str, data: dict = {}, session: 
     return count_cast_votes
 
 
-@api_router.get("/{election_uuid}/resume", status_code=200)
-async def resume(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+@api_router.get("/{short_name}/resume", status_code=200)
+async def resume(short_name: str, session: Session | AsyncSession = Depends(get_session)):
     """
     Route for get a resume election
     """
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
 
     voters = [v for v in voters if v.valid_cast_votes >= 1]
@@ -133,8 +133,8 @@ async def resume(election_uuid: str, session: Session | AsyncSession = Depends(g
 # ----- Voters routes -----
 
 
-@api_router.post("/election/{election_uuid}/voters", response_model=list[schemas.VoterOut], status_code=200)
-async def get_voters(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
+@api_router.post("/election/{short_name}/voters", response_model=list[schemas.VoterOut], status_code=200)
+async def get_voters(short_name: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
     """
     POST
 
@@ -148,14 +148,14 @@ async def get_voters(election_uuid: str, data: dict = {}, session: Session | Asy
     """
     page, page_size = paginate(data)
 
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     return await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
 
 
 # ----- Trustee routes -----
 
-@api_router.post("/election/{election_uuid}/trustees", status_code=200)
-async def get_trustees_election(election_uuid: str, data: dict = None, session: Session | AsyncSession = Depends(get_session)):
+@api_router.post("/election/{short_name}/trustees", status_code=200)
+async def get_trustees_election(short_name: str, data: dict = None, session: Session | AsyncSession = Depends(get_session)):
     """
     POST
 
@@ -170,7 +170,7 @@ async def get_trustees_election(election_uuid: str, data: dict = None, session: 
 
     page, page_size = paginate(data)
 
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     return await crud.get_trustees_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
 
 
@@ -187,8 +187,8 @@ async def get_trustee(trustee_uuid: str, session: Session | AsyncSession = Depen
 
 # ----- CastVote routes -----
 
-@api_router.post("/election/{election_uuid}/cast-votes", response_model=list[schemas.CastVoteOut], status_code=200)
-async def get_cast_votes(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
+@api_router.post("/election/{short_name}/cast-votes", response_model=list[schemas.CastVoteOut], status_code=200)
+async def get_cast_votes(short_name: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
 
     """
     This route delivers all the cast votes of an election
@@ -203,14 +203,14 @@ async def get_cast_votes(election_uuid: str, data: dict = {}, session: Session |
 
     page, page_size = paginate(data)
 
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     voters = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
     voters_id = [v.id for v in voters]
     return await crud.get_votes_by_ids(session=session, voters_id=voters_id)
 
 
-@api_router.get("/election/{election_uuid}/cast-vote/{hash_vote:path}", response_model=schemas.CastVoteOut, status_code=200)
-async def get_vote_by_hash(election_uuid: str, hash_vote, session: Session | AsyncSession = Depends(get_session)):
+@api_router.get("/election/{short_name}/cast-vote/{hash_vote:path}", response_model=schemas.CastVoteOut, status_code=200)
+async def get_vote_by_hash(short_name: str, hash_vote, session: Session | AsyncSession = Depends(get_session)):
 
     """
     This route return a cast vote by its hash
@@ -220,8 +220,8 @@ async def get_vote_by_hash(election_uuid: str, hash_vote, session: Session | Asy
     return await crud.get_cast_vote_by_hash(session=session, hash_vote=hash_vote)
 
 
-@api_router.post("/election/{election_uuid}/votes", response_model=schemas.UrnaOut, status_code=200)
-async def get_votes(election_uuid: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
+@api_router.post("/election/{short_name}/votes", response_model=schemas.UrnaOut, status_code=200)
+async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
 
     """
     POST
@@ -235,7 +235,7 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
     page_size = data.get("page_size", 50)
     page = page_size * page if page_size else None
     vote_hash = data.get("vote_hash", "")
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
 
     voters = await crud.get_voters_with_valid_vote(session=session, election_id=election.id)
     if vote_hash != "":
@@ -254,8 +254,8 @@ async def get_votes(election_uuid: str, data: dict = {}, session: Session | Asyn
     return schemas.UrnaOut(voters=voters_page, position=page, more_votes=more_votes, total_votes=len(voters))
 
 
-@api_router.get("/election/{election_uuid}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
-async def election_logs(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+@api_router.get("/election/{short_name}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
+async def election_logs(short_name: str, session: Session | AsyncSession = Depends(get_session)):
     """
     GET
 
@@ -263,15 +263,15 @@ async def election_logs(election_uuid: str, session: Session | AsyncSession = De
 
     """
 
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
     election_logs = await crud.get_election_logs(session=session, election_id=election.id)
     election_logs = list(filter(
         lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
     return election_logs
 
 
-@api_router.get("/election/{election_uuid}/bundle-file", response_model=bundle_schemas.Bundle, status_code=200)
-async def election_bundle_file(election_uuid: str, session: Session | AsyncSession = Depends(get_session)):
+@api_router.get("/election/{short_name}/bundle-file", response_model=bundle_schemas.Bundle, status_code=200)
+async def election_bundle_file(short_name: str, session: Session | AsyncSession = Depends(get_session)):
     """
     GET
 
@@ -279,7 +279,7 @@ async def election_bundle_file(election_uuid: str, session: Session | AsyncSessi
 
     """
 
-    election = await crud.get_election_by_uuid(session=session, uuid=election_uuid)
+    election = await crud.get_election_by_short_name(session=session, uuid=short_name)
     voters = [bundle_schemas.VoterBundle.from_orm(v) for v in election.voters]
     voters_id = [v.id for v in election.voters]
 

@@ -125,7 +125,7 @@ async def get_election_by_short_name(session: Session | AsyncSession, short_name
     )
 
     result = await db_handler.execute(session, query)
-    return result.scalars().all()
+    return result.scalars().first()
     
 
 
