@@ -39,7 +39,6 @@ class Election(Base):
     description = Column(Text)
 
     public_key = Column(Text, nullable=True)
-    private_key = Column(Text, nullable=True)  # PsifosObject: EGSecretKey
     questions = Column(Text, nullable=True)
 
     obscure_voter_names = Column(Boolean, default=False, nullable=False)
@@ -50,7 +49,6 @@ class Election(Base):
     total_voters = Column(Integer, default=0)
     total_trustees = Column(Integer, default=0)
 
-    cast_url = Column(String(500))
     encrypted_tally = Column(Text, nullable=True)
     encrypted_tally_hash = Column(Text, nullable=True)
 
@@ -130,14 +128,11 @@ class Trustee(Base):
     name = Column(String(200), nullable=False)
     trustee_login_id = Column(String(100), nullable=False)
     email = Column(Text, nullable=False)
-    secret = Column(String(100))
 
     current_step = Column(Integer, default=0)
 
     public_key = Column(Text, nullable=True)
     public_key_hash = Column(String(100), nullable=True)
-    secret_key = Column(Text, nullable=True)  # PsifosObject: EGSecretKey
-    pok = Column(Text, nullable=True)  # PsifosObject: DLogProof
 
     decryptions = Column(Text, nullable=True)
 
