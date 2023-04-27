@@ -17,7 +17,7 @@ class ElectionBundle(BaseModel):
     normalization: bool
     uuid: str
     public_key: object
-    questions: str
+    questions: object
 
     class Config:
         orm_mode = True
@@ -63,10 +63,10 @@ class TrusteeBundle(BaseModel):
     uuid: str
     public_key: object
     public_key_hash: str
-    decryptions: str
+    decryptions: list
     certificate: object
-    coefficients: str
-    acknowledgements: str
+    coefficients: list
+    acknowledgements: list
 
     class Config:
         orm_mode = True
@@ -80,7 +80,7 @@ class Bundle(BaseModel):
     election: ElectionBundle
     voters: list[VoterBundle] = []
     votes: list
-    result: str | None
+    result: list | None
     trustees: list[TrusteeBundle] = []
 
     class Config:

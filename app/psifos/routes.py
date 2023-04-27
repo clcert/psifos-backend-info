@@ -1,4 +1,4 @@
-from app.psifos.utils import paginate, tz_now
+from app.psifos.utils import paginate, tz_now, from_json
 from fastapi import APIRouter, Depends
 from app.dependencies import get_session
 from app.psifos.model import crud, schemas
@@ -280,19 +280,29 @@ async def election_bundle_file(short_name: str, session: Session | AsyncSession 
     """
 
     election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election.public_key = from_json(election.public_key)
+    election.questions = from_json(election.questions)
     voters = [bundle_schemas.VoterBundle.from_orm(v) for v in election.voters]
     voters_id = [v.id for v in election.voters]
 
     # Get votes by uuid and voter uuid
     votes = await crud.get_votes_by_ids(session=session, voters_id=voters_id)
     votes = [bundle_schemas.VoteBundle.from_orm(v) for v in votes]
-    votes = list(map(lambda v: {"vote": v.vote, "vote_hash": v.vote_hash,
+    votes = list(map(lambda v: {"vote": from_json(v.vote), "vote_hash": v.vote_hash,
                  "cast_at": v.cast_at, "voter_uuid": v.psifos_voter.uuid}, votes))
 
-    trustees = [bundle_schemas.TrusteeBundle.from_orm(
-        t) for t in election.trustees]
+    # Lets decode string to json
+    trustee_out = []
+    for t in election.trustees:
+        t.public_key = from_json(t.public_key)
+        t.decryptions = from_json(t.decryptions)
+        t.certificate = from_json(t.certificate)
+        t.coefficients = from_json(t.coefficients)
+        t.acknowledgements = from_json(t.acknowledgements)
+        trustee_out.append(t)
+
     return bundle_schemas.Bundle(election=bundle_schemas.ElectionBundle.from_orm(election),
                                  voters=voters,
                                  votes=votes,
-                                 result=election.result,
-                                 trustees=trustees)
+                                 result=from_json(election.result),
+                                 trustees=trustee_out)
