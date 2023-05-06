@@ -235,10 +235,22 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
     page_size = data.get("page_size", 50)
     page = page_size * page if page_size else None
     vote_hash = data.get("vote_hash", "")
+    voter_name = data.get("voter_name", "")
+    only_with_valid_vote = data.get("only_with_valid_vote")
     election = await crud.get_election_by_short_name(session=session, short_name=short_name)
 
-    voters = await crud.get_voters_with_valid_vote(session=session, election_id=election.id)
-    if vote_hash != "":
+    if only_with_valid_vote:
+        voters = await crud.get_voters_with_valid_vote(session=session, election_id=election.id)
+
+    else:
+        voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
+
+    if voter_name != "":
+        voters = list(
+            filter(lambda v: voter_name.lower() in v.voter_name.lower(), voters))
+        return schemas.UrnaOut(voters=voters, position=0, more_votes=False, total_votes=len(voters))
+
+    elif vote_hash != "":
         voters_id = [v.id for v in voters]
         hash_votes = await crud.get_hashes_vote(session=session, voters_id=voters_id)
 
