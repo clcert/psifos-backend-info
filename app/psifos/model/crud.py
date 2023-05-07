@@ -16,9 +16,7 @@ from sqlalchemy import and_
 
 
 ELECTION_QUERY_OPTIONS = [
-    selectinload(models.Election.voters).selectinload(
-        models.Voter.cast_vote
-    ),
+    selectinload(models.Election.voters),
     selectinload(models.Election.trustees),
     selectinload(models.Election.sharedpoints),
     selectinload(models.Election.audited_ballots)

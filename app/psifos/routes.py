@@ -241,7 +241,6 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
 
     if only_with_valid_vote:
         voters = await crud.get_voters_with_valid_vote(session=session, election_id=election.id)
-
     else:
         voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
 
@@ -258,9 +257,15 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
             index_hash = hash_votes.index((vote_hash,))
             page = index_hash - (index_hash % page_size)
 
-    voters_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page, page_size=page_size)
-    voters_next_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page + 1, page_size=page_size)
-    voters_page = [schemas.VoterOut.from_orm(v) for v in voters_page]
+    if only_with_valid_vote:
+        voters_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page, page_size=page_size)
+        voters_next_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page + 1, page_size=page_size)
+
+    else:
+        voters_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
+        voters_next_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page + 1, page_size=page_size)
+
+    voters_page = [schemas.VoterCastVote.from_orm(v) for v in voters_page]
     more_votes = len(voters_next_page) != 0
 
     return schemas.UrnaOut(voters=voters_page, position=page, more_votes=more_votes, total_votes=len(voters))

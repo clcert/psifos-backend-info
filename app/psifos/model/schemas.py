@@ -36,7 +36,6 @@ from pydantic import BaseModel, Field
 from app.psifos.model.enums import ElectionTypeEnum, ElectionStatusEnum
 
 
-
 # ------------------ model-related schemas ------------------
 
 
@@ -52,7 +51,9 @@ class TrusteeBase(BaseModel):
     email: str
     trustee_login_id: str
 
-# model (sqla) ModelElection -> SchemaElection  
+# model (sqla) ModelElection -> SchemaElection
+
+
 class TrusteeOut(TrusteeBase):
     """
     Schema for reading/returning trustee data.
@@ -82,6 +83,7 @@ class CastVoteBase(BaseModel):
     """
 
     vote: str | None
+
 
 class CastVoteOut(CastVoteBase):
     """
@@ -118,11 +120,16 @@ class VoterOut(VoterBase):
     voter_login_id: str
     voter_name: str
     voter_weight: int
-    cast_vote: object | None
 
     class Config:
         orm_mode = True
 
+
+class VoterCastVote(VoterOut):
+
+    cast_vote: object | None
+    class Config:
+        orm_mode = True
 
 #  Election-related schemas
 
@@ -141,7 +148,6 @@ class ElectionBase(BaseModel):
     randomize_answer_order: bool | None
     private_p: bool | None
     normalization: bool | None
-
 
 
 class ElectionOut(ElectionBase):
@@ -172,36 +178,47 @@ class ElectionOut(ElectionBase):
 # ------------------ response-related schemas ------------------
 class PublicKeyData(BaseModel):
     public_key_json: str
+
+
 class KeyGenStep1Data(BaseModel):
     coefficients: str
     points: str
+
+
 class KeyGenStep2Data(BaseModel):
     acknowledgements: str
+
+
 class KeyGenStep3Data(BaseModel):
     verification_key: str
 
+
 class DecryptionIn(BaseModel):
     decryptions: object
+
 
 class TrusteeHome(BaseModel):
     trustee: TrusteeOut
     election: ElectionOut
 
+
 class UrnaOut(BaseModel):
-    voters: list[VoterOut] = []
+    voters: list[VoterCastVote] = []
     position: int
     more_votes: bool
     total_votes: int
+
     class Config:
         orm_mode = True
+
 
 class ElectionLogOut(BaseModel):
 
     election_id: int
-    log_level: str 
-    event: str 
-    event_params: str 
-    created_at: str 
+    log_level: str
+    event: str
+    event_params: str
+    created_at: str
 
     class Config:
         orm_mode = True
