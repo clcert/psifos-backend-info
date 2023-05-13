@@ -162,13 +162,11 @@ class ElectionOut(ElectionBase):
     questions: object | None
     total_voters: int
     total_trustees: int
-    encrypted_tally: object | None
     encrypted_tally_hash: str | None
     result: object | None
     voters_by_weight_init: str | None
     voters_by_weight_end: str | None
 
-    voters: list[VoterOut] = []
     trustees: list[TrusteeOut] = []
 
     class Config:

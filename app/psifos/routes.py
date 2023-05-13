@@ -116,8 +116,8 @@ async def resume(short_name: str, session: Session | AsyncSession = Depends(get_
     """
     Route for get a resume election
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
-    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name, simple=True)
+    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id, simple=True)
 
     voters = [v for v in voters if v.valid_cast_votes >= 1]
     normalized_weights = [v.voter_weight / election.max_weight for v in voters]
