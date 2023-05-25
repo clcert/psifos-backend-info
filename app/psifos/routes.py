@@ -233,7 +233,6 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
 
     page = data.get("page", 0)
     page_size = data.get("page_size", 50)
-    page = page_size * page if page_size else None
     vote_hash = data.get("vote_hash", "")
     voter_name = data.get("voter_name", "")
     only_with_valid_vote = data.get("only_with_valid_vote")
