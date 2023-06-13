@@ -10,6 +10,8 @@ SECRET_KEY: str = os.environ.get("SECRET_KEY")
 USE_ASYNC_ENGINE = bool(int(os.environ.get("USE_ASYNC_ENGINE", False)))
 TIMEZONE = os.environ.get("TIMEZONE", "Chile/Continental")
 
+TOKEN_ANALYTICS_INFO = os.environ.get("TOKEN_ANALYTICS_INFO")
+
 ORIGINS: list = [
     "*"
 ]
