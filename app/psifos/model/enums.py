@@ -15,6 +15,7 @@ class ElectionStatusEnum(str, enum.Enum):
     started = "Started"
     ended = "Ended"
     tally_computed = "Tally computed"
+    computing_tally = "Computing Tally"
     decryptions_uploaded = "Decryptions uploaded"
     decryptions_combined = "Decryptions combined"
     results_released = "Results released"
