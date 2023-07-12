@@ -16,25 +16,33 @@ from sqlalchemy import and_
 
 
 ELECTION_QUERY_OPTIONS = [
-    selectinload(models.Election.voters),
     selectinload(models.Election.trustees),
     selectinload(models.Election.sharedpoints),
     selectinload(models.Election.audited_ballots)
 ]
 
-VOTER_QUERY_OPTIONS = selectinload(
+COMPLETE_ELECTION_QUERY_OPTIONS = [
+    selectinload(models.Election.trustees),
+    selectinload(models.Election.sharedpoints),
+    selectinload(models.Election.audited_ballots),
+    selectinload(models.Election.voters)
+]
+
+VOTER_QUERY_OPTIONS = [selectinload(
     models.Voter.cast_vote
-)
+)]
 
 # ----- Voter CRUD Utils -----
 
 
-async def get_voters_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
+async def get_voters_by_election_id(session: Session | AsyncSession, election_id: int, page=0, page_size=None, simple: bool = False):
+
+    query_options = [] if simple else VOTER_QUERY_OPTIONS
     offset_value = page*page_size if page_size else None
     query = select(models.Voter).outerjoin(models.CastVote).where(
         models.Voter.election_id == election_id
     ).offset(offset_value).limit(page_size).options(
-        VOTER_QUERY_OPTIONS
+        *query_options
     )
 
     result = await db_handler.execute(session, query)
@@ -47,7 +55,7 @@ async def get_voters_with_valid_vote(session: Session | AsyncSession, election_i
         models.Voter.election_id == election_id, and_(
             models.Voter.valid_cast_votes != 0)
     ).offset(offset_value).limit(page_size).options(
-        VOTER_QUERY_OPTIONS
+        *VOTER_QUERY_OPTIONS
     )
 
     result = await db_handler.execute(session, query)
@@ -116,11 +124,12 @@ async def get_elections(session: Session | AsyncSession, page: int = 0, page_siz
     return result.scalars().all()
 
 
-async def get_election_by_short_name(session: Session | AsyncSession, short_name: str):
+async def get_election_by_short_name(session: Session | AsyncSession, short_name: str, simple: bool = False):
+    query_options = ELECTION_QUERY_OPTIONS if simple else COMPLETE_ELECTION_QUERY_OPTIONS
     query = select(models.Election).where(
         models.Election.short_name == short_name
     ).options(
-        *ELECTION_QUERY_OPTIONS
+        *query_options
     )
 
     result = await db_handler.execute(session, query)
