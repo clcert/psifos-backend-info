@@ -38,6 +38,7 @@ class ElectionPublicEventEnum(ElectionEvenEnum):
     TALLY_COMPUTED = "tally_computed"
     DECRYPTION_RECIEVED = "decryption_recieved"
     DECRYPTIONS_COMBINED = "decryptions_combined"
+    RESULTS_RELEASED = "results_released"
 
 class ElectionAdminEventEnum(ElectionEvenEnum):
     VOTER_LOGIN = "voter_login"
