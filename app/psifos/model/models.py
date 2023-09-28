@@ -44,6 +44,7 @@ class Election(Base):
     obscure_voter_names = Column(Boolean, default=False, nullable=False)
     randomize_answer_order = Column(Boolean, default=False, nullable=False)
     normalization = Column(Boolean, default=False, nullable=False)
+    grouped = Column(Boolean, default=False, nullable=False)
     max_weight = Column(Integer, nullable=False)
 
     total_voters = Column(Integer, default=0)
