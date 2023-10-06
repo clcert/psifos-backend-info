@@ -63,7 +63,7 @@ class TrusteeBundle(BaseModel):
     uuid: str
     public_key: object
     public_key_hash: str
-    decryptions: list
+    decryptions: list | None
     certificate: object
     coefficients: list
     acknowledgements: list
