@@ -120,6 +120,7 @@ class VoterOut(VoterBase):
     voter_login_id: str
     voter_name: str
     voter_weight: int
+    count_vote: bool
 
     class Config:
         orm_mode = True

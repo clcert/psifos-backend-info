@@ -75,6 +75,10 @@ async def get_election_stats(short_name: str, session: Session | AsyncSession = 
             session=session,
             election_id=election.id
         ),
+        "num_count_votes": await crud.get_num_counted_votes(
+            session=session,
+            election_id=election.id
+        ),
         "total_voters": election.total_voters,
         "status": election.election_status,
         "name": election.short_name
