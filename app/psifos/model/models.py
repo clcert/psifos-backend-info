@@ -82,6 +82,7 @@ class Voter(Base):
 
     valid_cast_votes = Column(Integer, default=0)
     invalid_cast_votes = Column(Integer, default=0)
+    count_vote = Column(Boolean, nullable=False)
     
     # One-to-one relationship
     cast_vote = relationship("CastVote", cascade="all, delete", backref="psifos_voter", uselist=False)

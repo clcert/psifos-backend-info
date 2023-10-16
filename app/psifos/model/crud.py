@@ -161,6 +161,10 @@ async def get_num_casted_votes(session: Session | AsyncSession, election_id: int
     voters = await get_voters_by_election_id(session=session, election_id=election_id)
     return len([v for v in voters if v.valid_cast_votes >= 1])
 
+async def get_num_counted_votes(session: Session | AsyncSession, election_id: int):
+    voters = await get_voters_by_election_id(session=session, election_id=election_id)
+    return len([v for v in voters if v.valid_cast_votes >= 1 and v.count_vote])
+
 
 async def count_cast_vote_by_date(session: Session | AsyncSession, init_date, end_date, election_id: int):
 
