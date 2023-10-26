@@ -81,6 +81,26 @@ async def get_election_stats(short_name: str, session: Session | AsyncSession = 
     }
 
 
+@api_router.post("/get-election-group-stats/{short_name}", status_code=200)
+async def get_election_group_stats(short_name: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
+    """
+    Route for getting the stats of a specific election.
+    """
+    group = data.get("group")
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    group_voters = await crud.get_voters_group_by_election_id(session=session, election_id=election.id, group=group)
+    return {
+        "num_casted_votes": await crud.get_num_casted_votes_group(
+            session=session,
+            election_id=election.id,
+            group=group
+        ),
+        "total_voters": len(group_voters),
+        "status": election.election_status,
+        "name": election.short_name
+    }
+
+
 @api_router.post("/{short_name}/count-dates", status_code=200)
 async def get_count_votes_by_date(short_name: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
     """
@@ -119,16 +139,30 @@ async def resume(short_name: str, session: Session | AsyncSession = Depends(get_
     election = await crud.get_election_by_short_name(session=session, short_name=short_name, simple=True)
     voters = await crud.get_voters_by_election_id(session=session, election_id=election.id, simple=True)
 
-    voters = [v for v in voters if v.valid_cast_votes >= 1]
-    normalized_weights = [v.voter_weight / election.max_weight for v in voters]
-    votes_by_weight = json.dumps(
-        {str(w): normalized_weights.count(w) for w in normalized_weights})
+    valid_voters = [v for v in voters if v.valid_cast_votes >= 1]
+    voters_group = {}
+    votes_election = {}
+
+    for v in valid_voters:
+        normalized_weight = v.voter_weight / election.max_weight
+        voters_group.setdefault(v.group, []).append(normalized_weight)
+        votes_election[normalized_weight] = votes_election.get(
+            normalized_weight, 0) + 1
+
+    votes_by_weight = [{"group": group, "weights": {str(w): value.count(
+        w) for w in value}} for group, value in voters_group.items()]
+
+    votes_by_weight = json.dumps({
+        "voters_by_weight": votes_election,
+        "voters_by_weight_grouped": votes_by_weight
+    })
 
     return {
         "weights_init": election.voters_by_weight_init,
         "weights_election": votes_by_weight,
         "weights_end": election.voters_by_weight_end
     }
+
 
 # ----- Voters routes -----
 

@@ -49,6 +49,20 @@ async def get_voters_by_election_id(session: Session | AsyncSession, election_id
     return result.scalars().all()
 
 
+async def get_voters_group_by_election_id(session: Session | AsyncSession, election_id: int, group: str, page=0, page_size=None, simple: bool = False):
+
+    query_options = [] if simple else VOTER_QUERY_OPTIONS
+    offset_value = page*page_size if page_size else None
+    query = select(models.Voter).outerjoin(models.CastVote).where(
+        models.Voter.election_id == election_id, models.Voter.group == group
+    ).offset(offset_value).limit(page_size).options(
+        *query_options
+    )
+
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
+
+
 async def get_voters_with_valid_vote(session: Session | AsyncSession, election_id: int, page=0, page_size=None):
     offset_value = page*page_size if page_size else None
     query = select(models.Voter).outerjoin(models.CastVote).where(
@@ -159,6 +173,11 @@ async def get_election_logs(session: Session | AsyncSession, election_id: int):
 
 async def get_num_casted_votes(session: Session | AsyncSession, election_id: int):
     voters = await get_voters_by_election_id(session=session, election_id=election_id)
+    return len([v for v in voters if v.valid_cast_votes >= 1])
+
+
+async def get_num_casted_votes_group(session: Session | AsyncSession, election_id: int, group: str):
+    voters = await get_voters_group_by_election_id(session=session, election_id=election_id, group=group)
     return len([v for v in voters if v.valid_cast_votes >= 1])
 
 
