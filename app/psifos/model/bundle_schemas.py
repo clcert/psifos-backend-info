@@ -80,7 +80,7 @@ class Bundle(BaseModel):
     election: ElectionBundle
     voters: list[VoterBundle] = []
     votes: list
-    result: list | None
+    result: object | None
     trustees: list[TrusteeBundle] = []
 
     class Config:
