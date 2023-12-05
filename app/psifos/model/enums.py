@@ -42,3 +42,8 @@ class ElectionPublicEventEnum(ElectionEvenEnum):
 
 class ElectionAdminEventEnum(ElectionEvenEnum):
     VOTER_LOGIN = "voter_login"
+
+class ElectionLoginTypeEnum(str, enum.Enum):
+    close_p = "Close"
+    open_p = "Open"
+    semi_close_p = "Semi Public"
