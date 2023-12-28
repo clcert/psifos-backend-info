@@ -19,7 +19,7 @@ from sqlalchemy import (
 )
 
 
-from app.psifos.model.enums import ElectionStatusEnum, ElectionTypeEnum
+from app.psifos.model.enums import ElectionStatusEnum, ElectionTypeEnum, ElectionLoginTypeEnum
 from app.database import Base
 from app.psifos import utils
 
@@ -35,7 +35,7 @@ class Election(Base):
     name = Column(String(250), nullable=False)
     election_type = Column(Enum(ElectionTypeEnum), nullable=False)
     election_status = Column(Enum(ElectionStatusEnum), default="setting_up")
-    private_p = Column(Boolean, default=False, nullable=False)
+    election_login_type =  Column(Enum(ElectionLoginTypeEnum), default="private")
     description = Column(Text)
 
     public_key = Column(Text, nullable=True)
