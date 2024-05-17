@@ -164,6 +164,74 @@ async def resume(short_name: str, session: Session | AsyncSession = Depends(get_
     }
 
 
+@api_router.get("/election/{short_name}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
+async def election_logs(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    GET
+
+    Is used to obtain the different logs of an election
+
+    """
+
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election_logs = await crud.get_election_logs(session=session, election_id=election.id)
+    election_logs = list(filter(
+        lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
+    return election_logs
+
+
+@api_router.get("/election/{short_name}/bundle-file", response_model=bundle_schemas.Bundle, status_code=200)
+async def election_bundle_file(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    GET
+
+    It is used to get all the necessary values ​​for the bundle file.
+
+    """
+
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election.public_key = from_json(election.public_key)
+    election.questions = from_json(election.questions)
+    voters = [bundle_schemas.VoterBundle.from_orm(v) for v in election.voters]
+    voters_id = [v.id for v in election.voters]
+
+    # Get votes by uuid and voter uuid
+    votes = await crud.get_votes_by_ids(session=session, voters_id=voters_id)
+    votes = [bundle_schemas.VoteBundle.from_orm(v) for v in votes]
+    votes = list(map(lambda v: {"vote": from_json(v.vote), "vote_hash": v.vote_hash,
+                 "cast_at": v.cast_at, "voter_uuid": v.psifos_voter.uuid}, votes))
+
+    # Lets decode string to json
+    trustee_out = []
+    for t in election.trustees:
+        t.public_key = from_json(t.public_key)
+        t.decryptions = from_json(t.decryptions)
+        t.certificate = from_json(t.certificate)
+        t.coefficients = from_json(t.coefficients)
+        t.acknowledgements = from_json(t.acknowledgements)
+        trustee_out.append(t)
+
+    return bundle_schemas.Bundle(election=bundle_schemas.ElectionBundle.from_orm(election),
+                                 voters=voters,
+                                 votes=votes,
+                                 result=from_json(election.result),
+                                 trustees=trustee_out)
+
+
+@api_router.get("/election/{short_name}/get_status", status_code=200)
+async def get_election_status(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    GET
+
+    Returns the status of an election
+    """
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    return {
+        "election_short_name": short_name,
+        "status": election.election_status
+    }
+
+
 # ----- Voters routes -----
 
 
@@ -302,57 +370,3 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
     more_votes = len(voters_next_page) != 0
 
     return schemas.UrnaOut(voters=voters_page, position=page, more_votes=more_votes, total_votes=len(voters))
-
-
-@api_router.get("/election/{short_name}/election-logs", response_model=list[schemas.ElectionLogOut], status_code=200)
-async def election_logs(short_name: str, session: Session | AsyncSession = Depends(get_session)):
-    """
-    GET
-
-    Is used to obtain the different logs of an election
-
-    """
-
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
-    election_logs = await crud.get_election_logs(session=session, election_id=election.id)
-    election_logs = list(filter(
-        lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
-    return election_logs
-
-
-@api_router.get("/election/{short_name}/bundle-file", response_model=bundle_schemas.Bundle, status_code=200)
-async def election_bundle_file(short_name: str, session: Session | AsyncSession = Depends(get_session)):
-    """
-    GET
-
-    It is used to get all the necessary values ​​for the bundle file.
-
-    """
-
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
-    election.public_key = from_json(election.public_key)
-    election.questions = from_json(election.questions)
-    voters = [bundle_schemas.VoterBundle.from_orm(v) for v in election.voters]
-    voters_id = [v.id for v in election.voters]
-
-    # Get votes by uuid and voter uuid
-    votes = await crud.get_votes_by_ids(session=session, voters_id=voters_id)
-    votes = [bundle_schemas.VoteBundle.from_orm(v) for v in votes]
-    votes = list(map(lambda v: {"vote": from_json(v.vote), "vote_hash": v.vote_hash,
-                 "cast_at": v.cast_at, "voter_uuid": v.psifos_voter.uuid}, votes))
-
-    # Lets decode string to json
-    trustee_out = []
-    for t in election.trustees:
-        t.public_key = from_json(t.public_key)
-        t.decryptions = from_json(t.decryptions)
-        t.certificate = from_json(t.certificate)
-        t.coefficients = from_json(t.coefficients)
-        t.acknowledgements = from_json(t.acknowledgements)
-        trustee_out.append(t)
-
-    return bundle_schemas.Bundle(election=bundle_schemas.ElectionBundle.from_orm(election),
-                                 voters=voters,
-                                 votes=votes,
-                                 result=from_json(election.result),
-                                 trustees=trustee_out)
