@@ -169,8 +169,6 @@ class ElectionOut(ElectionBase):
     voters_by_weight_init: str | None
     voters_by_weight_end: str | None
 
-    trustees: list[TrusteeOut] = []
-
     class Config:
         orm_mode = True
 
