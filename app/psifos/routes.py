@@ -8,6 +8,7 @@ from urllib.parse import unquote
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.psifos.model.enums import ElectionPublicEventEnum
 from datetime import timedelta
+from app.psifos.model import models
 
 import datetime
 import json
@@ -69,7 +70,15 @@ async def get_election_stats(short_name: str, session: Session | AsyncSession = 
     """
     Route for getting the stats of a specific election.
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+
+    query_options = [
+        models.Election.id,
+        models.Election.total_voters,
+        models.Election.election_status,
+        models.Election.short_name
+    ]
+
+    election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=query_options)
     return {
         "num_casted_votes": await crud.get_num_casted_votes(
             session=session,
@@ -173,8 +182,8 @@ async def election_logs(short_name: str, session: Session | AsyncSession = Depen
 
     """
 
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
-    election_logs = await crud.get_election_logs(session=session, election_id=election.id)
+    election_id = await crud.get_election_id_by_short_name(session=session, short_name=short_name)
+    election_logs = await crud.get_election_logs(session=session, election_id=election_id)
     election_logs = list(filter(
         lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
     return election_logs
@@ -225,10 +234,10 @@ async def get_election_status(short_name: str, session: Session | AsyncSession =
 
     Returns the status of an election
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election_status = await crud.get_election_status_by_short_name(session=session, short_name=short_name)
     return {
         "election_short_name": short_name,
-        "status": election.election_status
+        "status": election_status
     }
 
 
