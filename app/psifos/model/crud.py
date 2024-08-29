@@ -18,14 +18,20 @@ from sqlalchemy import and_
 ELECTION_QUERY_OPTIONS = [
     selectinload(models.Election.trustees),
     selectinload(models.Election.sharedpoints),
-    selectinload(models.Election.audited_ballots)
+    selectinload(models.Election.audited_ballots),
+    selectinload(models.Election.public_key),
+    selectinload(models.Election.questions),
+    selectinload(models.Election.result),
 ]
 
 COMPLETE_ELECTION_QUERY_OPTIONS = [
     selectinload(models.Election.trustees),
     selectinload(models.Election.sharedpoints),
     selectinload(models.Election.audited_ballots),
-    selectinload(models.Election.voters)
+    selectinload(models.Election.voters),
+    selectinload(models.Election.public_key),
+    selectinload(models.Election.questions),
+    selectinload(models.Election.result),
 ]
 
 VOTER_QUERY_OPTIONS = [selectinload(

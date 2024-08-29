@@ -38,6 +38,18 @@ from app.psifos.model.enums import ElectionTypeEnum, ElectionStatusEnum, Electio
 
 # ------------------ model-related schemas ------------------
 
+class PublicKeyBase(BaseModel):
+    """
+    Basic public key schema.
+    """
+
+    y: str
+    p: str
+    g: str
+    q: str
+
+    class Config:
+        orm_mode = True
 
 #  Trustee-related schemas
 
@@ -116,7 +128,6 @@ class VoterOut(VoterBase):
     Schema for reading/returning voter data.
     """
 
-    uuid: str
     voter_login_id: str
     voter_name: str
     voter_weight: int
@@ -160,7 +171,8 @@ class ElectionOut(ElectionBase):
     id: int
     uuid: str
     election_status: ElectionStatusEnum
-    public_key: object | None
+    decryptions_uploaded: int
+    public_key: PublicKeyBase | None
     questions: object | None
     total_voters: int
     total_trustees: int
@@ -168,8 +180,11 @@ class ElectionOut(ElectionBase):
     result: object | None
     voters_by_weight_init: str | None
     voters_by_weight_end: str | None
+    trustees: object | None
 
-    trustees: list[TrusteeOut] = []
+
+    class Config:
+        orm_mode = True
 
     class Config:
         orm_mode = True
