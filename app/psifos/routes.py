@@ -71,14 +71,14 @@ async def get_election_stats(short_name: str, session: Session | AsyncSession = 
     Route for getting the stats of a specific election.
     """
 
-    query_options = [
+    election_params = [
         models.Election.id,
         models.Election.total_voters,
         models.Election.election_status,
         models.Election.short_name
     ]
 
-    election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=query_options)
+    election = await crud.get_election_params_by_name(session=session, short_name=short_name, params=election_params)
     return {
         "num_casted_votes": await crud.get_num_casted_votes(
             session=session,
@@ -145,7 +145,14 @@ async def resume(short_name: str, session: Session | AsyncSession = Depends(get_
     """
     Route for get a resume election
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name, simple=True)
+
+    election_params = [
+        models.Election.id,
+        models.Election.voters_by_weight_init,
+        models.Election.voters_by_weight_end,
+        models.Election.max_weight
+    ]
+    election = await crud.get_election_params_by_name(session=session, short_name=short_name, params=election_params)
     voters = await crud.get_voters_by_election_id(session=session, election_id=election.id, simple=True)
 
     valid_voters = [v for v in voters if v.valid_cast_votes >= 1]
