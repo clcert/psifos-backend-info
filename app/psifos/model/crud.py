@@ -155,6 +155,27 @@ async def get_election_by_short_name(session: Session | AsyncSession, short_name
     result = await db_handler.execute(session, query)
     return result.scalars().first()
 
+async def get_election_options_by_name(session: Session | AsyncSession, short_name: str, options: list):
+    query = select(*options).where(
+        models.Election.short_name == short_name
+    )
+
+    result = await db_handler.execute(session, query)
+    return result.first()
+
+async def get_election_status_by_short_name(session: Session | AsyncSession, short_name: str):
+    query = select(models.Election.election_status).where(
+        models.Election.short_name == short_name
+    )
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()
+
+async def get_election_id_by_short_name(session: Session | AsyncSession, short_name: str):
+    query = select(models.Election.id).where(
+        models.Election.short_name == short_name
+    )
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()
 
 async def get_election_by_uuid(session: Session | AsyncSession, uuid: str):
     query = select(models.Election).where(
