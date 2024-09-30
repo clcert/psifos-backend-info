@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.psifos.model import models
-from sqlalchemy import select
+from sqlalchemy import select, func, distinct
 from sqlalchemy.orm import selectinload
 from app.database import db_handler
 from sqlalchemy import and_
@@ -178,8 +178,15 @@ async def get_election_logs(session: Session | AsyncSession, election_id: int):
 
 
 async def get_num_casted_votes(session: Session | AsyncSession, election_id: int):
-    voters = await get_voters_by_election_id(session=session, election_id=election_id)
-    return len([v for v in voters if v.valid_cast_votes >= 1])
+    query = (
+        select(func.count(distinct(models.CastVote.voter_id)))
+        .join(models.Voter, models.Voter.id == models.CastVote.voter_id)
+        .where(models.Voter.election_id == election_id)
+        .where(models.CastVote.is_valid == True)
+    )
+    
+    result = await session.scalar(query)    
+    return result or 0
 
 
 async def get_num_casted_votes_group(session: Session | AsyncSession, election_id: int, group: str):

@@ -54,8 +54,7 @@ class Election(Base):
     total_voters = Column(Integer, default=0)
     total_trustees = Column(Integer, default=0)
 
-    encrypted_tally = Column(Text, nullable=True)
-    encrypted_tally_hash = Column(Text, nullable=True)
+    encrypted_tally = relationship("Tally", back_populates="election")
 
     decryptions_uploaded = Column(Integer, default=0)
 
@@ -153,8 +152,12 @@ class Trustee(Base):
 
     public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True)
     public_key_hash = Column(String(100), nullable=True)
-    decryptions = Column(Text, nullable=True)
-
+    decryptions_homomorphic = relationship(
+        "HomomorphicDecryption", cascade="all, delete", back_populates="psifos_trustee"
+    )
+    decryptions_mixnet = relationship(
+        "MixnetDecryption", cascade="all, delete", back_populates="psifos_trustee"
+    )
     certificate = Column(Text, nullable=True)
     coefficients = Column(Text, nullable=True)
     acknowledgements = Column(Text, nullable=True)
@@ -226,14 +229,14 @@ class AbstractQuestion(Base):
     election = relationship("Election", back_populates="questions")
 
     TALLY_TYPE_MAP = {
-        QuestionTypeEnum.CLOSED: "CLOSED",
+        QuestionTypeEnum.CLOSED: "HOMOMORPHIC",
         QuestionTypeEnum.MIXNET: "MIXNET",
         QuestionTypeEnum.STVNC: "STVNC"
     }
 
     def __init__(self, *args, **kwargs):
         super(AbstractQuestion, self).__init__(*args, **kwargs)
-        self.tally_type = self.TALLY_TYPE_MAP.get(self.q_type, "CLOSED")
+        self.tally_type = self.TALLY_TYPE_MAP.get(self.q_type, "")
 
     @property
     def closed_options_list(self):
@@ -298,3 +301,125 @@ class PublicKey(Base):
             'g': (self._g),
             'q': (self._q)
         }
+
+class TallyTypeEnum(str, enum.Enum):
+    HOMOMORPHIC = "HOMOMORPHIC"
+    MIXNET = "MIXNET"
+    STVNC = "STVNC"
+
+class Tally(Base):
+    __tablename__ = "psifos_tallies"
+
+    id = Column(Integer, primary_key=True, index=True)
+    election_id = Column(Integer, ForeignKey("psifos_election.id"), nullable=False)
+    group = Column(Text, nullable=False)
+    with_votes = Column(Boolean, default=False)
+    tally_type = Column(Enum(TallyTypeEnum), nullable=False)
+    q_num = Column(Integer, nullable=False)
+    num_options = Column(Integer, nullable=False, default=0)
+    computed = Column(Boolean, default=False)
+    num_tallied = Column(Integer, nullable=False, default=0)
+    max_answers = Column(Integer, nullable=True)
+    num_of_winners = Column(Integer, nullable=True)
+    include_blank_null = Column(Boolean, nullable=True)
+    tally = Column(Text, nullable=False, default=[])
+
+    election = relationship("Election", back_populates="encrypted_tally")
+
+    def __repr__(self):
+        return f"Tally(id={self.id}, tally_type={self.tally_type}, election_id={self.election_id}, group={self.group}, with_votes={self.with_votes})"
+    
+    __mapper_args__ = {
+        'polymorphic_on': tally_type,
+        'polymorphic_identity': 'tally',
+        'with_polymorphic': '*'
+    }
+
+class HomomorphicTally(Tally):
+    """
+    Homomorhic tally implementation for closed questions.
+    """
+
+    __mapper_args__ = {
+        'polymorphic_identity': TallyTypeEnum.HOMOMORPHIC,
+    }
+
+    def __init__(self, tally=None, **kwargs) -> None:
+        """
+        HomomorphicTally constructor, allows the creation of this tally.
+        
+        If computed==False then questions cannot be None.
+        Else, tally cannot be None
+        """
+        super(HomomorphicTally, self).__init__(**kwargs)
+
+class MixnetTally(Tally):
+    """
+    Mixnet tally implementation for open questions.
+    """
+    __mapper_args__ = {
+        'polymorphic_identity': TallyTypeEnum.MIXNET,
+    }
+
+
+    def __init__(self, tally=None, **kwargs) -> None:
+        super(MixnetTally, self).__init__(**kwargs)
+        self.tally_type = "mixnet"
+
+class STVTally(MixnetTally):
+
+    __mapper_args__ = {
+        'polymorphic_identity': TallyTypeEnum.STVNC,
+    }
+
+    def __init__(self, tally=None, **kwargs) -> None:
+        MixnetTally.__init__(self, tally, **kwargs)
+        self.tally_type = "stvnc"
+        self.num_of_winners = int(kwargs["num_of_winners"])
+        self.include_blank_null = kwargs["include_blank_null"]
+        self.max_answers = int(kwargs["max_answers"])
+
+class HomomorphicDecryption(Base):
+    """
+    Implementation of a Trustee's partial decryption
+    of an election question with an homomorphic tally.
+    """
+
+    __tablename__ = "psifos_decryptions_homomorphic"
+
+    id = Column(Integer, primary_key=True, index=True)
+    trustee_id = Column(Integer, ForeignKey("psifos_trustee.id"), nullable=False)
+    group = Column(Text, nullable=False)
+    q_num = Column(Integer, nullable=False)
+
+    psifos_trustee = relationship("Trustee", back_populates="decryptions_homomorphic")
+    decryption_factors = Column(Text, nullable=True)
+    decryption_proofs = Column(Text, nullable=True)
+
+    def __init__(self, decryption_factors, decryption_proofs, decryption_type, **kwargs) -> None:
+        super(HomomorphicDecryption, self).__init__(**kwargs)
+        self.decryption_type = decryption_type
+
+
+class MixnetDecryption(Base):
+    """
+    Implementation of a Trustee's partial decryption
+    of an election question with an mixnet tally.
+
+    # TODO: Implement this type of decryption.
+    """
+
+    __tablename__ = "psifos_decryptions_mixnet"
+
+    id = Column(Integer, primary_key=True, index=True)
+    trustee_id = Column(Integer, ForeignKey("psifos_trustee.id"), nullable=False)
+    group = Column(Text, nullable=False)
+    q_num = Column(Integer, nullable=False)
+
+    psifos_trustee = relationship("Trustee", back_populates="decryptions_mixnet")
+    decryption_factors = Column(Text, nullable=True)
+    decryption_proofs = Column(Text, nullable=True)
+
+    def __init__(self, decryption_factors, decryption_proofs, decryption_type, **kwargs) -> None:
+        super(MixnetDecryption, self).__init__(**kwargs)
+        self.decryption_type = decryption_type
