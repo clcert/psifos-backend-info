@@ -197,7 +197,6 @@ async def get_election_logs(session: Session | AsyncSession, election_id: int):
     result = await db_handler.execute(session, query)
     return result.scalars().all()
 
-
 async def get_num_casted_votes(session: Session | AsyncSession, election_id: int):
     query = (
         select(func.count(distinct(models.CastVote.voter_id)))
@@ -209,11 +208,9 @@ async def get_num_casted_votes(session: Session | AsyncSession, election_id: int
     result = await session.scalar(query)    
     return result or 0
 
-
 async def get_num_casted_votes_group(session: Session | AsyncSession, election_id: int, group: str):
     voters = await get_voters_group_by_election_id(session=session, election_id=election_id, group=group)
     return len([v for v in voters if v.valid_cast_votes >= 1])
-
 
 async def count_cast_vote_by_date(session: Session | AsyncSession, init_date, end_date, election_id: int):
 
