@@ -13,6 +13,8 @@ from app.psifos.model import models
 import datetime
 import json
 
+from unidecode import unidecode
+
 # api_router = APIRouter(prefix="/psifos/api/public")
 api_router = APIRouter()
 
@@ -356,7 +358,7 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
 
     if voter_name != "":
         voters = list(
-            filter(lambda v: (voter_name.lower() in v.voter_name.lower()) or (voter_name.lower() in v.voter_login_id.lower()), voters))
+            filter(lambda v: (unidecode(voter_name.lower()) in unidecode(v.voter_name.lower())) or (unidecode(voter_name.lower()) in unidecode(v.voter_login_id.lower())), voters))
             # filter(lambda v: voter_name.lower() in v.voter_name.lower(), voters))
         return schemas.UrnaOut(voters=voters, position=0, more_votes=False, total_votes=len(voters))
 
