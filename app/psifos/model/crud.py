@@ -221,3 +221,19 @@ async def count_cast_vote_by_date(session: Session | AsyncSession, init_date, en
                  models.CastVote.cast_at <= end_date))
     result = await db_handler.execute(session, query)
     return result.all()
+
+# === Public Key ===
+async def get_public_key_by_id(session: Session | AsyncSession, public_key_id: int):
+    query = select(models.PublicKey).where(models.PublicKey.id == public_key_id)
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()
+
+async def get_decryption_by_trustee_id(session: Session | AsyncSession, trustee_id: int):
+    query = select(models.HomomorphicDecryption).where(models.HomomorphicDecryption.trustee_id == trustee_id)
+    result = await db_handler.execute(session, query)
+    result = result.scalars().all()
+    if not result:
+        query = select(models.MixnetDecryption).where(models.MixnetDecryption.trustee_id == trustee_id)
+        result = await db_handler.execute(session, query)
+        result = result.scalars().all()
+    return result
