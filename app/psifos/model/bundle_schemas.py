@@ -30,7 +30,6 @@ class VoterBundle(BaseModel):
 
     voter_login_id: str
     voter_weight: int
-    uuid: str
     voter_name: str
 
     class Config:

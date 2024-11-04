@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.psifos.model import models
-from sqlalchemy import select
+from sqlalchemy import select, func, distinct
 from sqlalchemy.orm import selectinload
 from app.database import db_handler
 from sqlalchemy import and_
@@ -18,14 +18,20 @@ from sqlalchemy import and_
 ELECTION_QUERY_OPTIONS = [
     selectinload(models.Election.trustees),
     selectinload(models.Election.sharedpoints),
-    selectinload(models.Election.audited_ballots)
+    selectinload(models.Election.audited_ballots),
+    selectinload(models.Election.public_key),
+    selectinload(models.Election.questions),
+    selectinload(models.Election.result),
 ]
 
 COMPLETE_ELECTION_QUERY_OPTIONS = [
     selectinload(models.Election.trustees),
     selectinload(models.Election.sharedpoints),
     selectinload(models.Election.audited_ballots),
-    selectinload(models.Election.voters)
+    selectinload(models.Election.voters),
+    selectinload(models.Election.public_key),
+    selectinload(models.Election.questions),
+    selectinload(models.Election.result),
 ]
 
 VOTER_QUERY_OPTIONS = [selectinload(
@@ -191,16 +197,20 @@ async def get_election_logs(session: Session | AsyncSession, election_id: int):
     result = await db_handler.execute(session, query)
     return result.scalars().all()
 
-
 async def get_num_casted_votes(session: Session | AsyncSession, election_id: int):
-    voters = await get_voters_by_election_id(session=session, election_id=election_id)
-    return len([v for v in voters if v.valid_cast_votes >= 1])
-
+    query = (
+        select(func.count(distinct(models.CastVote.voter_id)))
+        .join(models.Voter, models.Voter.id == models.CastVote.voter_id)
+        .where(models.Voter.election_id == election_id)
+        .where(models.CastVote.is_valid == True)
+    )
+    
+    result = await session.scalar(query)    
+    return result or 0
 
 async def get_num_casted_votes_group(session: Session | AsyncSession, election_id: int, group: str):
     voters = await get_voters_group_by_election_id(session=session, election_id=election_id, group=group)
     return len([v for v in voters if v.valid_cast_votes >= 1])
-
 
 async def count_cast_vote_by_date(session: Session | AsyncSession, init_date, end_date, election_id: int):
 
@@ -211,3 +221,19 @@ async def count_cast_vote_by_date(session: Session | AsyncSession, init_date, en
                  models.CastVote.cast_at <= end_date))
     result = await db_handler.execute(session, query)
     return result.all()
+
+# === Public Key ===
+async def get_public_key_by_id(session: Session | AsyncSession, public_key_id: int):
+    query = select(models.PublicKey).where(models.PublicKey.id == public_key_id)
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()
+
+async def get_decryption_by_trustee_id(session: Session | AsyncSession, trustee_id: int):
+    query = select(models.HomomorphicDecryption).where(models.HomomorphicDecryption.trustee_id == trustee_id)
+    result = await db_handler.execute(session, query)
+    result = result.scalars().all()
+    if not result:
+        query = select(models.MixnetDecryption).where(models.MixnetDecryption.trustee_id == trustee_id)
+        result = await db_handler.execute(session, query)
+        result = result.scalars().all()
+    return result
