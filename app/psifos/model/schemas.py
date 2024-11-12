@@ -32,12 +32,25 @@ When we deal with SQLAlchemy we must note the following:
 
 from datetime import datetime
 from pydantic import BaseModel, Field
+from typing import List
 
 from app.psifos.model.enums import ElectionTypeEnum, ElectionStatusEnum, ElectionLoginTypeEnum
 
 
 # ------------------ model-related schemas ------------------
 
+class PublicKeyBase(BaseModel):
+    """
+    Basic public key schema.
+    """
+
+    y: str
+    p: str
+    g: str
+    q: str
+
+    class Config:
+        orm_mode = True
 
 #  Trustee-related schemas
 
@@ -116,7 +129,6 @@ class VoterOut(VoterBase):
     Schema for reading/returning voter data.
     """
 
-    uuid: str
     voter_login_id: str
     voter_name: str
     voter_weight: int
@@ -133,6 +145,27 @@ class VoterCastVote(VoterOut):
         orm_mode = True
 
 #  Election-related schemas
+
+class QuestionBase(BaseModel):
+    """
+    Schema for creating a question.
+    """
+    q_num: int
+    q_type: str
+    q_text: str
+    q_description: str | None
+    total_options: int
+    total_closed_options: int
+    closed_options_list: List[str] | None
+    max_answers: int
+    min_answers: int
+    include_blank_null: bool | None
+    tally_type: str
+    group_votes: bool | None
+    num_of_winners: int | None
+
+    class Config:
+        orm_mode = True
 
 
 class ElectionBase(BaseModel):
@@ -160,14 +193,16 @@ class ElectionOut(ElectionBase):
     id: int
     uuid: str
     election_status: ElectionStatusEnum
-    public_key: object | None
-    questions: object | None
+    decryptions_uploaded: int
+    public_key: PublicKeyBase | None
+    questions: list[QuestionBase] | None
     total_voters: int
     total_trustees: int
     encrypted_tally_hash: str | None
     result: object | None
     voters_by_weight_init: str | None
     voters_by_weight_end: str | None
+    trustees: object | None
 
     class Config:
         orm_mode = True

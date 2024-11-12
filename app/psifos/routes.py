@@ -8,9 +8,12 @@ from urllib.parse import unquote
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.psifos.model.enums import ElectionPublicEventEnum
 from datetime import timedelta
+from app.psifos.model import models
 
 import datetime
 import json
+
+from unidecode import unidecode
 
 # api_router = APIRouter(prefix="/psifos/api/public")
 api_router = APIRouter()
@@ -69,7 +72,15 @@ async def get_election_stats(short_name: str, session: Session | AsyncSession = 
     """
     Route for getting the stats of a specific election.
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+
+    query_options = [
+        models.Election.id,
+        models.Election.total_voters,
+        models.Election.election_status,
+        models.Election.short_name
+    ]
+
+    election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=query_options)
     return {
         "num_casted_votes": await crud.get_num_casted_votes(
             session=session,
@@ -173,8 +184,8 @@ async def election_logs(short_name: str, session: Session | AsyncSession = Depen
 
     """
 
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
-    election_logs = await crud.get_election_logs(session=session, election_id=election.id)
+    election_id = await crud.get_election_id_by_short_name(session=session, short_name=short_name)
+    election_logs = await crud.get_election_logs(session=session, election_id=election_id)
     election_logs = list(filter(
         lambda log: ElectionPublicEventEnum.has_member_key(log.event), election_logs))
     return election_logs
@@ -199,13 +210,13 @@ async def election_bundle_file(short_name: str, session: Session | AsyncSession 
     votes = await crud.get_votes_by_ids(session=session, voters_id=voters_id)
     votes = [bundle_schemas.VoteBundle.from_orm(v) for v in votes]
     votes = list(map(lambda v: {"vote": from_json(v.vote), "vote_hash": v.vote_hash,
-                 "cast_at": v.cast_at, "voter_uuid": v.psifos_voter.uuid}, votes))
+                 "cast_at": v.cast_at}, votes))
 
     # Lets decode string to json
     trustee_out = []
     for t in election.trustees:
-        t.public_key = from_json(t.public_key)
-        t.decryptions = from_json(t.decryptions)
+        t.public_key = await crud.get_public_key_by_id(session=session, public_key_id=t.public_key_id)
+        t.decryptions = await crud.get_decryption_by_trustee_id(session=session, trustee_id=t.id)
         t.certificate = from_json(t.certificate)
         t.coefficients = from_json(t.coefficients)
         t.acknowledgements = from_json(t.acknowledgements)
@@ -225,10 +236,10 @@ async def get_election_status(short_name: str, session: Session | AsyncSession =
 
     Returns the status of an election
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election_status = await crud.get_election_status_by_short_name(session=session, short_name=short_name)
     return {
         "election_short_name": short_name,
-        "status": election.election_status
+        "status": election_status
     }
 
 
@@ -347,7 +358,8 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
 
     if voter_name != "":
         voters = list(
-            filter(lambda v: voter_name.lower() in v.voter_name.lower(), voters))
+            filter(lambda v: (unidecode(voter_name.lower()) in unidecode(v.voter_name.lower())) or (unidecode(voter_name.lower()) in unidecode(v.voter_login_id.lower())), voters))
+            # filter(lambda v: voter_name.lower() in v.voter_name.lower(), voters))
         return schemas.UrnaOut(voters=voters, position=0, more_votes=False, total_votes=len(voters))
 
     elif vote_hash != "":
