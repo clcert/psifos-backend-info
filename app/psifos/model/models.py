@@ -41,9 +41,11 @@ class Election(Base):
     election_status = Column(Enum(ElectionStatusEnum), default="setting_up")
     election_login_type =  Column(Enum(ElectionLoginTypeEnum), default="close_p")
     description = Column(Text)
+    
+    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id", ondelete="CASCADE"), nullable=True, unique=True)
+    public_key = relationship("PublicKey", back_populates="elections", uselist=False, cascade="all, delete")
 
-    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True)
-    questions = relationship("AbstractQuestion", back_populates="election")
+    questions = relationship("AbstractQuestion", cascade="all, delete", back_populates="election")
 
     obscure_voter_names = Column(Boolean, default=False, nullable=False)
     randomize_answer_order = Column(Boolean, default=False, nullable=False)
@@ -64,15 +66,14 @@ class Election(Base):
     voters_by_weight_init = Column(Text, nullable=True)
     voters_by_weight_end = Column(Text, nullable=True)
 
-    result = relationship("Results",uselist=False, cascade="all, delete", back_populates="election")
+    result = relationship("Results",uselist=False, cascade="all, delete", backref="psifos_election")
 
-    public_key = relationship("PublicKey", back_populates="elections")
 
     # One-to-many relationships
     voters = relationship("Voter", cascade="all, delete",
                           backref="psifos_election")
     trustees = relationship(
-        "Trustee", cascade="all, delete", backref="psifos_election")
+        "TrusteeCrypto", cascade="all, delete", backref="psifos_election")
     sharedpoints = relationship(
         "SharedPoint", cascade="all, delete", backref="psifos_election"
     ) # TODO: Check 
@@ -134,24 +135,15 @@ class Trustee(Base):
     __tablename__ = "psifos_trustee"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(
-        Integer,
-        ForeignKey("psifos_election.id",
-                   onupdate="CASCADE", ondelete="CASCADE"),
-    )
-    trustee_id = Column(
-        Integer, nullable=False
-    )  # TODO: rename to index for deambiguation with trustee_id func. param at await crud.py
     uuid = Column(String(50), nullable=False, unique=True)
 
     name = Column(String(200), nullable=False)
-    trustee_login_id = Column(String(100), nullable=False)
+    trustee_login_id = Column(String(100), nullable=False, unique=True)
     email = Column(Text, nullable=False)
     trustee_crypto = relationship(
         "TrusteeCrypto", cascade="all, delete",
         back_populates="trustee"
     ) 
-
 
 class TrusteeCrypto(Base):
     __tablename__ = "psifos_trustee_crypto"
@@ -174,7 +166,9 @@ class TrusteeCrypto(Base):
 
     current_step = Column(Integer, default=0)
 
-    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True)
+    public_key = relationship("PublicKey", back_populates="trustees", uselist=False, single_parent=True)
+    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True, unique=True)
+
     public_key_hash = Column(String(100), nullable=True)
     decryptions_homomorphic = relationship(
         "HomomorphicDecryption", cascade="all, delete", back_populates="trustee_crypto"
@@ -191,14 +185,10 @@ class TrusteeCrypto(Base):
     def get_decryptions_group(self, group):
         if self.decryptions:
             decryptions_group = filter(
-                lambda dic: dic.get(
-                    "group") == group, self.decryptions.instances
+                lambda dic: dic.group == group, self.decryptions.instances
             )
             return next(decryptions_group)
         return None
-    public_key = relationship("PublicKey", back_populates="trustees")
-
-
 class SharedPoint(Base):
     __tablename__ = "psifos_shared_point"
 
