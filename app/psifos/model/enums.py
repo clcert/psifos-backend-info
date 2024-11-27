@@ -12,10 +12,12 @@ class ElectionTypeEnum(str, enum.Enum):
 
 class ElectionStatusEnum(str, enum.Enum):
     setting_up = "Setting up"
+    ready_key_generation = "Ready for key generation"
+    ready_opening = "Ready for opening"
     started = "Started"
     ended = "Ended"
-    tally_computed = "Tally computed"
     computing_tally = "Computing Tally"
+    tally_computed = "Tally computed"
     decryptions_uploaded = "Decryptions uploaded"
     decryptions_combined = "Decryptions combined"
     results_released = "Results released"
