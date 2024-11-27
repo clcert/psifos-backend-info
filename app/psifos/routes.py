@@ -121,7 +121,8 @@ async def get_count_votes_by_date(short_name: str, data: dict = {}, session: Ses
 
     election = await crud.get_election_by_short_name(session=session, short_name=short_name)
 
-    if election.election_status == "Setting up":
+    states_without_data = ["Setting up", "Ready for key generation", "Ready for opening"]
+    if election.election_status in states_without_data:
         return {}
 
     date_init = election.voting_started_at
