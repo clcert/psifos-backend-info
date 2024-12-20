@@ -28,7 +28,7 @@ class VoterBundle(BaseModel):
     Voter schema for bundle file
     """
 
-    voter_login_id: str
+    username: str
     voter_weight: int
     voter_name: str
 

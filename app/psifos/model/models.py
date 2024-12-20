@@ -33,13 +33,12 @@ class Election(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     admin_id = Column(Integer, ForeignKey("auth_user.id"))
-    uuid = Column(String(50), nullable=False, unique=True)
 
-    short_name = Column(String(100), nullable=False, unique=True)
-    name = Column(String(250), nullable=False)
-    election_type = Column(Enum(ElectionTypeEnum), nullable=False)
-    election_status = Column(Enum(ElectionStatusEnum), default="setting_up")
-    election_login_type =  Column(Enum(ElectionLoginTypeEnum), default="close_p")
+    short_name = Column(String(50), nullable=False, unique=True)
+    long_name = Column(String(150), nullable=False)
+    type = Column(Enum(ElectionTypeEnum), nullable=False)
+    status = Column(Enum(ElectionStatusEnum), default="setting_up")
+    voters_login_type =  Column(Enum(ElectionLoginTypeEnum), default="close_p")
     description = Column(Text)
     
     public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id", ondelete="CASCADE"), nullable=True, unique=True)
@@ -47,27 +46,15 @@ class Election(Base):
 
     questions = relationship("AbstractQuestion", cascade="all, delete", back_populates="election")
 
-    obscure_voter_names = Column(Boolean, default=False, nullable=False)
-    randomize_answer_order = Column(Boolean, default=False, nullable=False)
-    normalization = Column(Boolean, default=False, nullable=False)
-    grouped = Column(Boolean, default=False, nullable=False)
+    obscure_voter_names = Column(Boolean, default=False, nullable=False) # Lo eliminamos?
+    randomized_options = Column(Boolean, default=False, nullable=False)
+    normalized = Column(Boolean, default=False, nullable=False)
+    grouped_voters = Column(Boolean, default=False, nullable=False)
     max_weight = Column(Integer, nullable=False)
-
-    total_voters = Column(Integer, default=0)
-    total_trustees = Column(Integer, default=0)
 
     encrypted_tally = relationship("Tally", back_populates="election")
 
-    decryptions_uploaded = Column(Integer, default=0)
-
-    voting_started_at = Column(DateTime, nullable=True)
-    voting_ended_at = Column(DateTime, nullable=True)
-
-    voters_by_weight_init = Column(Text, nullable=True)
-    voters_by_weight_end = Column(Text, nullable=True)
-
     result = relationship("Results",uselist=False, cascade="all, delete", backref="psifos_election")
-
 
     # One-to-many relationships
     voters = relationship("Voter", cascade="all, delete",
@@ -90,12 +77,12 @@ class Voter(Base):
         ForeignKey("psifos_election.id",
                    onupdate="CASCADE", ondelete="CASCADE"),
     )
-    voter_login_id = Column(String(100), nullable=False)
-    voter_name = Column(String(200), nullable=False)
-    voter_weight = Column(Integer, nullable=False)
+    username = Column(String(100), nullable=False)
+    name = Column(String(200), nullable=False)
 
-    valid_cast_votes = Column(Integer, default=0)
-    invalid_cast_votes = Column(Integer, default=0)
+    username_election_id = Column(String(50), nullable=False, unique=True)
+    weight_init = Column(Integer, nullable=False)
+    weight_end = Column(Integer, nullable=True)
 
     group = Column(String(200), nullable=True)
     # One-to-one relationship
@@ -103,22 +90,21 @@ class Voter(Base):
         "CastVote", cascade="all, delete", backref="psifos_voter", uselist=False
     )
 
-
 class CastVote(Base):
     __tablename__ = "psifos_cast_vote"
 
     id = Column(Integer, primary_key=True, index=True)
-    voter_id = Column(Integer, ForeignKey("psifos_voter.id", onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    voter_id = Column(
+        Integer,
+        ForeignKey("psifos_voter.id", onupdate="CASCADE", ondelete="CASCADE"),
+        unique=True,
+    )
 
-    vote = Column(Text, nullable=False)
-    vote_hash = Column(String(500), nullable=False)
-    # vote_tinyhash = Column(String(500), nullable=False)
+    encrypted_ballot = Column(Text, nullable=False)
+    encrypted_ballot_hash = Column(String(500), nullable=False)
 
     is_valid = Column(Boolean, nullable=False)
-
-
     cast_at = Column(DateTime, nullable=False)
-
 
 class AuditedBallot(Base):
     __tablename__ = "psifos_audited_ballot"
@@ -135,10 +121,9 @@ class Trustee(Base):
     __tablename__ = "psifos_trustee"
 
     id = Column(Integer, primary_key=True, index=True)
-    uuid = Column(String(50), nullable=False, unique=True)
 
     name = Column(String(200), nullable=False)
-    trustee_login_id = Column(String(100), nullable=False, unique=True)
+    username = Column(String(100), nullable=False, unique=True)
     email = Column(Text, nullable=False)
     trustee_crypto = relationship(
         "TrusteeCrypto", cascade="all, delete",
@@ -235,22 +220,24 @@ class AbstractQuestion(Base):
     __tablename__ = "psifos_questions"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"), nullable=False)
-    q_num = Column(Integer, nullable=False)
-    q_type = Column(Enum(QuestionTypeEnum), nullable=False)
-    q_text = Column(Text, nullable=False)
-    q_description = Column(Text, nullable=True)
-    total_options = Column(Integer, nullable=False)
-    total_closed_options = Column(Integer, nullable=False)
-    closed_options = Column(Text, nullable=True)
+    election_id = Column(Integer, ForeignKey("psifos_election.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    index = Column(Integer, nullable=False)
+    type = Column(Enum(QuestionTypeEnum), nullable=False)
+    title = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    formal_options = Column(JSON, nullable=True)
     max_answers = Column(Integer, nullable=False)
     min_answers = Column(Integer, nullable=False)
-    include_blank_null = Column(String(50), nullable=True)
+    include_informal_options = Column(String(50), nullable=True)
     tally_type = Column(String(50), nullable=False)
-    group_votes = Column(String(50), nullable=True)
+    grouped_options = Column(String(50), nullable=True)
     num_of_winners = Column(Integer, nullable=True)
+    excluded_options = Column(Boolean, nullable=True)
+    options_specifications = Column(JSON, nullable=True)
+    open_option_max_size = Column(Integer, nullable=True)
+    total_open_options = Column(Integer, nullable=True)
 
-    election = relationship("Election", back_populates="questions")
+    election = relationship("Election", back_populates="questions", cascade="all, delete")
 
     TALLY_TYPE_MAP = {
         QuestionTypeEnum.CLOSED: "HOMOMORPHIC",
@@ -261,14 +248,6 @@ class AbstractQuestion(Base):
     def __init__(self, *args, **kwargs):
         super(AbstractQuestion, self).__init__(*args, **kwargs)
         self.tally_type = self.TALLY_TYPE_MAP.get(self.q_type, "")
-
-    @property
-    def closed_options_list(self):
-        return json.loads(self.closed_options) if self.closed_options else []
-
-    @closed_options_list.setter
-    def closed_options_list(self, value):
-        self.closed_options = json.dumps(value)
 
 class PublicKey(Base):
     __tablename__ = "psifos_public_keys"
