@@ -171,7 +171,6 @@ class ElectionBase(BaseModel):
     description: str | None
     type: ElectionTypeEnum = Field(max_length=100)
     max_weight: int
-    obscure_voter_names: bool | None
     randomize_answer_order: bool | None
     voters_login_type: ElectionLoginTypeEnum =Field(max_length=100)
     normalization: bool | None

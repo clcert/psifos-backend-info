@@ -13,7 +13,6 @@ class ElectionBundle(BaseModel):
     long_name: str
     description: str
     max_weight: int
-    obscure_voter_names: bool
     normalized: bool
     public_key: object
     questions: object
