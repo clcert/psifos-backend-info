@@ -10,12 +10,11 @@ class ElectionBundle(BaseModel):
     """
 
     short_name: str
-    name: str
+    long_name: str
     description: str
     max_weight: int
     obscure_voter_names: bool
-    normalization: bool
-    uuid: str
+    normalized: bool
     public_key: object
     questions: object
 
@@ -29,8 +28,8 @@ class VoterBundle(BaseModel):
     """
 
     username: str
-    voter_weight: int
-    voter_name: str
+    weight_end: int
+    name: str
 
     class Config:
         orm_mode = True
@@ -41,8 +40,8 @@ class VoteBundle(BaseModel):
     Vote schema for bundle file
     """
 
-    vote: object
-    vote_hash: str
+    encrypted_ballot: object
+    encrypted_ballot_hash: str
     cast_at: datetime
     psifos_voter: VoterBundle
 
@@ -55,11 +54,7 @@ class TrusteeBundle(BaseModel):
     Trustee schema for bundle file
     """
 
-    name: str
-    email: str
-    trustee_login_id: str
     trustee_id: int
-    uuid: str
     public_key: object
     public_key_hash: str
     decryptions: list | None

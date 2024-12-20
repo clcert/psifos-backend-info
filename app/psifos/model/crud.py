@@ -248,12 +248,18 @@ async def get_public_key_by_id(session: Session | AsyncSession, public_key_id: i
     result = await db_handler.execute(session, query)
     return result.scalars().first()
 
-async def get_decryption_by_trustee_id(session: Session | AsyncSession, trustee_id: int):
-    query = select(models.HomomorphicDecryption).where(models.HomomorphicDecryption.trustee_id == trustee_id)
+async def get_decryption_by_trustee_id(session: Session | AsyncSession, trustee_crypto_id: int):
+    query = select(models.HomomorphicDecryption).where(models.HomomorphicDecryption.trustee_crypto_id == trustee_crypto_id)
     result = await db_handler.execute(session, query)
     result = result.scalars().all()
     if not result:
-        query = select(models.MixnetDecryption).where(models.MixnetDecryption.trustee_id == trustee_id)
+        query = select(models.MixnetDecryption).where(models.MixnetDecryption.trustee_crypto_id == trustee_crypto_id)
         result = await db_handler.execute(session, query)
         result = result.scalars().all()
     return result
+
+# === Trustee Crypto ===
+async def get_trustee_crypto_by_id(session: Session | AsyncSession, trustee_crypto_id: int):
+    query = select(models.TrusteeCrypto).where(models.TrusteeCrypto.id == trustee_crypto_id)
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()

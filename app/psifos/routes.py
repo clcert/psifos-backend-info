@@ -293,14 +293,14 @@ async def election_bundle_file(short_name: str, session: Session | AsyncSession 
     # Get votes by uuid and voter uuid
     votes = await crud.get_votes_by_ids(session=session, voters_id=voters_id)
     votes = [bundle_schemas.VoteBundle.from_orm(v) for v in votes]
-    votes = list(map(lambda v: {"vote": from_json(v.vote), "vote_hash": v.vote_hash,
+    votes = list(map(lambda v: {"encrypted_ballot": from_json(v.encrypted_ballot), "encrypted_ballot_hash": v.encrypted_ballot_hash,
                  "cast_at": v.cast_at}, votes))
 
     # Lets decode string to json
     trustee_out = []
     for t in election.trustees:
         t.public_key = await crud.get_public_key_by_id(session=session, public_key_id=t.public_key_id)
-        t.decryptions = await crud.get_decryption_by_trustee_id(session=session, trustee_id=t.id)
+        t.decryptions = await crud.get_decryption_by_trustee_id(session=session, trustee_crypto_id=t.id)
         t.certificate = from_json(t.certificate)
         t.coefficients = from_json(t.coefficients)
         t.acknowledgements = from_json(t.acknowledgements)

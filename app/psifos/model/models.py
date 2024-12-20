@@ -16,11 +16,12 @@ from sqlalchemy import (
     Text,
     Enum,
     DateTime,
-    JSON
+    JSON,
 )
+from sqlalchemy.dialects.mysql import LONGTEXT
 
 
-from app.psifos.model.enums import ElectionStatusEnum, ElectionTypeEnum, ElectionLoginTypeEnum
+from app.psifos.model.enums import ElectionStatusEnum, ElectionTypeEnum, ElectionLoginTypeEnum, TrusteeStepEnum
 from app.database import Base
 from app.psifos import utils
 
@@ -52,9 +53,10 @@ class Election(Base):
     grouped_voters = Column(Boolean, default=False, nullable=False)
     max_weight = Column(Integer, nullable=False)
 
-    encrypted_tally = relationship("Tally", back_populates="election")
+    decryptions_uploaded = Column(Integer, default=0)
 
     result = relationship("Results",uselist=False, cascade="all, delete", backref="psifos_election")
+
 
     # One-to-many relationships
     voters = relationship("Voter", cascade="all, delete",
@@ -67,6 +69,19 @@ class Election(Base):
     audited_ballots = relationship(
         "AuditedBallot", cascade="all, delete", backref="psifos_election"
     )
+
+    @property
+    def total_trustees(self):
+        return len(self.trustees)
+    
+    @property
+    def decryptions_uploaded(self):
+        sent_decryptions_trustees = [t for t in self.trustees if t.current_step == TrusteeStepEnum.decryptions_sent]
+        return len(sent_decryptions_trustees)
+    
+    @property
+    def total_questions(self):
+        return len(self.questions)
 
 class Voter(Base):
     __tablename__ = "psifos_voter"
@@ -227,7 +242,7 @@ class AbstractQuestion(Base):
     description = Column(Text, nullable=True)
     formal_options = Column(JSON, nullable=True)
     max_answers = Column(Integer, nullable=False)
-    min_answers = Column(Integer, nullable=False)
+    min_answers = Column(Integer, nullable=False) 
     include_informal_options = Column(String(50), nullable=True)
     tally_type = Column(String(50), nullable=False)
     grouped_options = Column(String(50), nullable=True)
@@ -238,6 +253,14 @@ class AbstractQuestion(Base):
     total_open_options = Column(Integer, nullable=True)
 
     election = relationship("Election", back_populates="questions", cascade="all, delete")
+    encrypted_tally = relationship("Tally", back_populates="question")
+
+    decryptions_homomorphic = relationship(
+        "HomomorphicDecryption", cascade="all, delete", back_populates="question"
+    )
+    decryptions_mixnet = relationship(
+        "MixnetDecryption", cascade="all, delete", back_populates="question"
+    )
 
     TALLY_TYPE_MAP = {
         QuestionTypeEnum.CLOSED: "HOMOMORPHIC",
@@ -247,8 +270,16 @@ class AbstractQuestion(Base):
 
     def __init__(self, *args, **kwargs):
         super(AbstractQuestion, self).__init__(*args, **kwargs)
-        self.tally_type = self.TALLY_TYPE_MAP.get(self.q_type, "")
+        self.tally_type = self.TALLY_TYPE_MAP.get(self.type, "CLOSED")
+    
+    @property
+    def total_options(self):
+        """Calculate the length of formal_options if it exists, otherwise return 0."""
+        if not self.formal_options:
+            return 0
 
+        informal_options_count = 2 if self.include_informal_options else 0
+        return len(self.formal_options) + informal_options_count
 class PublicKey(Base):
     __tablename__ = "psifos_public_keys"
 
@@ -314,29 +345,29 @@ class Tally(Base):
     __tablename__ = "psifos_tallies"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("psifos_questions.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     group = Column(Text, nullable=False)
     with_votes = Column(Boolean, default=False)
     tally_type = Column(Enum(TallyTypeEnum), nullable=False)
-    q_num = Column(Integer, nullable=False)
-    num_options = Column(Integer, nullable=False, default=0)
     computed = Column(Boolean, default=False)
     num_tallied = Column(Integer, nullable=False, default=0)
-    max_answers = Column(Integer, nullable=True)
-    num_of_winners = Column(Integer, nullable=True)
-    include_blank_null = Column(Boolean, nullable=True)
-    tally = Column(Text, nullable=False, default=[])
+    encrypted_tally = Column(LONGTEXT, nullable=False, default=[])
 
-    election = relationship("Election", back_populates="encrypted_tally")
+    question = relationship("AbstractQuestion", cascade="all, delete", back_populates="encrypted_tally")
 
-    def __repr__(self):
-        return f"Tally(id={self.id}, tally_type={self.tally_type}, election_id={self.election_id}, group={self.group}, with_votes={self.with_votes})"
+    @property
+    def index(self):
+        """Calculate the length of formal_options if it exists, otherwise return 0."""
+        if not self.question:
+            return None
+        return self.question.index
     
-    __mapper_args__ = {
-        'polymorphic_on': tally_type,
-        'polymorphic_identity': 'tally',
-        'with_polymorphic': '*'
-    }
+    @property
+    def num_options(self):
+        """Calculate the length of formal_options if it exists, otherwise return 0."""
+        if not self.question:
+            return 0
+        return self.question.total_options
 
 class HomomorphicTally(Tally):
     """
@@ -391,17 +422,19 @@ class HomomorphicDecryption(Base):
     __tablename__ = "psifos_decryptions_homomorphic"
 
     id = Column(Integer, primary_key=True, index=True)
-    trustee_crypto_id = Column(Integer, ForeignKey("psifos_trustee_crypto.id"), nullable=False)
+    trustee_crypto_id = Column(Integer, ForeignKey("psifos_trustee_crypto.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    question_id = Column(Integer, ForeignKey("psifos_questions.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     group = Column(Text, nullable=False)
-    q_num = Column(Integer, nullable=False)
 
-    trustee_crypto = relationship("TrusteeCrypto", back_populates="decryptions_homomorphic")
+    trustee_crypto = relationship("TrusteeCrypto", back_populates="decryptions_homomorphic", cascade="all, delete")
+    question = relationship("AbstractQuestion", cascade="all, delete", back_populates="decryptions_homomorphic")
+
     decryption_factors = Column(Text, nullable=True)
     decryption_proofs = Column(Text, nullable=True)
 
-    def __init__(self, decryption_factors, decryption_proofs, decryption_type, **kwargs) -> None:
-        super(HomomorphicDecryption, self).__init__(**kwargs)
-        self.decryption_type = decryption_type
+    @property
+    def index(self):
+        return self.question.index
 
 
 class MixnetDecryption(Base):
@@ -415,14 +448,16 @@ class MixnetDecryption(Base):
     __tablename__ = "psifos_decryptions_mixnet"
 
     id = Column(Integer, primary_key=True, index=True)
-    trustee_crypto_id = Column(Integer, ForeignKey("psifos_trustee_crypto.id"), nullable=False)
+    trustee_crypto_id = Column(Integer, ForeignKey("psifos_trustee_crypto.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    question_id = Column(Integer, ForeignKey("psifos_questions.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     group = Column(Text, nullable=False)
-    q_num = Column(Integer, nullable=False)
 
-    trustee_crypto = relationship("TrusteeCrypto", back_populates="decryptions_mixnet")
+    trustee_crypto = relationship("TrusteeCrypto", back_populates="decryptions_mixnet", cascade="all, delete")
+    question = relationship("AbstractQuestion", cascade="all, delete", back_populates="decryptions_mixnet")
+
     decryption_factors = Column(Text, nullable=True)
     decryption_proofs = Column(Text, nullable=True)
 
-    def __init__(self, decryption_factors, decryption_proofs, decryption_type, **kwargs) -> None:
-        super(MixnetDecryption, self).__init__(**kwargs)
-        self.decryption_type = decryption_type
+    @property
+    def index(self):
+        return self.question.index
