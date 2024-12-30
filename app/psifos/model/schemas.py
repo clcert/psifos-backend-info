@@ -173,8 +173,8 @@ class ElectionBase(BaseModel):
     max_weight: int
     randomize_answer_order: bool | None
     voters_login_type: ElectionLoginTypeEnum =Field(max_length=100)
-    normalization: bool | None
-    grouped: bool | None
+    normalized: bool | None
+    grouped_voters: bool | None
 
 
 class ElectionOut(ElectionBase):
