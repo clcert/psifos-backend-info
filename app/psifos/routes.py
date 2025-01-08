@@ -6,7 +6,7 @@ from app.psifos.model import bundle_schemas
 from sqlalchemy.orm import Session
 from urllib.parse import unquote
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.psifos.model.enums import ElectionPublicEventEnum
+from app.psifos.model.enums import ElectionPublicEventEnum, TrusteeStepEnum, ElectionStatusEnum, ElectionLoginTypeEnum
 from datetime import timedelta
 from app.psifos.model import models
 
@@ -111,6 +111,15 @@ async def get_election_group_stats(short_name: str, data: dict = {}, session: Se
         "name": election.short_name
     }
 
+@api_router.get("/{short_name}/get-questions", status_code=200)
+async def get_questions(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    Route for get the questions of an election
+    """
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    return {
+        "questions": election.questions
+    }
 
 @api_router.post("/{short_name}/count-dates", status_code=200)
 async def get_count_votes_by_date(short_name: str, data: dict = {}, session: Session | AsyncSession = Depends(get_session)):
@@ -150,7 +159,7 @@ async def get_total_voters(short_name: str, session: Session | AsyncSession = De
     """
     Route for get the total voters of an election
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name, simple=True)
     total_voters = await crud.get_total_voters_by_election_id(session=session, election_id=election.id)
     return {
         "total_voters": total_voters
@@ -161,11 +170,26 @@ async def get_total_trustees(short_name: str, session: Session | AsyncSession = 
     """
     Route for get the total trustees of an election
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name, simple=True)
     return {
         "total_trustees": await crud.get_total_trustees_by_election_id(session=session, election_id=election.id)
     }
-        
+
+@api_router.get("/{short_name}/election-has-questions", status_code=200)
+async def election_has_questions(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    return {"result": bool(election.questions)}
+
+@api_router.get("/{short_name}/election-has-trustees", status_code=200)
+async def election_has_trustees(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    return {"result": bool(election.trustees)}
+
+@api_router.get("/{short_name}/election-has-voters", status_code=200)
+async def election_has_voters(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    return {"result": bool(election.voters)}
+
 @api_router.get("/{short_name}/voters-by-weight-init", status_code=200)
 async def get_voters_by_weight_init(short_name: str, session: Session | AsyncSession = Depends(get_session)):
 
@@ -175,15 +199,15 @@ async def get_voters_by_weight_init(short_name: str, session: Session | AsyncSes
     ]
 
     election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=election_params)
-    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
+    voters = await crud.get_voters_by_group_and_weight_initial(session=session, election_id=election.id)
 
     normalized_weights = {}
     voters_by_weight_init = {}
     for v in voters:
-        v_g = v.group
-        v_w = v.weight_init / election.max_weight
-        normalized_weights.setdefault(v_g, []).append(v_w)
-        voters_by_weight_init[v_w] = voters_by_weight_init.get(v_w, 0) + 1
+        v_group, v_weight_init, total_voters = v
+        v_w = v_weight_init / election.max_weight
+        normalized_weights.setdefault(v_group, []).extend([v_w] * total_voters)
+        voters_by_weight_init[v_w] = voters_by_weight_init.get(v_w, 0) + total_voters
 
     voters_by_weight_init_grouped = [
         {"group": group, "weights": {
@@ -208,17 +232,17 @@ async def get_votes_by_weight_init(short_name: str, session: Session | AsyncSess
     ]
 
     election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=election_params)
-    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id, simple=True)
+    voters = await crud.get_voters_by_group_and_weight_valid(session=session, election_id=election.id)
 
-    valid_voters = [v for v in voters if await crud.has_valid_vote(session, v.id)]
     voters_group = {}
     votes_election = {}
 
-    for v in valid_voters:
-        normalized_weight = v.weight_init / election.max_weight
-        voters_group.setdefault(v.group, []).append(normalized_weight)
+    for v in voters:
+        v_group, v_weight_init, _, total_voters = v
+        normalized_weight = v_weight_init / election.max_weight
+        voters_group.setdefault(v_group, []).extend([normalized_weight] * total_voters)
         votes_election[normalized_weight] = votes_election.get(
-            normalized_weight, 0) + 1
+            normalized_weight, 0) + total_voters
 
     votes_by_weight = [{"group": group, "weights": {str(w): value.count(
         w) for w in value}} for group, value in voters_group.items()]
@@ -237,16 +261,15 @@ async def get_votes_by_weight_end(short_name: str, session: Session | AsyncSessi
         models.Election.max_weight
     ]
     election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=election_params)
-    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
+    voters = await crud.get_voters_by_group_and_weight_valid(session=session, election_id=election.id)
 
-    valid_voters = [v for v in voters if await crud.has_valid_vote(session, v.id)]
     votes_by_weight_end = {}
     normalized_weights = {}
-    for v in valid_voters:
-        v_w = v.weight_end / election.max_weight
-        v_g = v.group
-        normalized_weights.setdefault(v_g, []).append(v_w)
-        votes_by_weight_end[v_w] = votes_by_weight_end.get(v_w, 0) + 1
+    for v in voters:
+        v_group, _, v_weight_end, total_voters = v
+        v_w = v_weight_end / election.max_weight
+        normalized_weights.setdefault(v_group, []).extend([v_w] * total_voters)
+        votes_by_weight_end[v_w] = votes_by_weight_end.get(v_w, 0) + total_voters
 
     votes_by_weight_end_grouped = [
         {"group": group, "weights": {
@@ -466,3 +489,41 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
     more_votes = len(voters_next_page) != 0
 
     return schemas.UrnaOut(voters=voters_page, position=page, more_votes=more_votes, total_votes=len(voters))
+
+@api_router.get("/{short_name}/check-status", status_code=200)
+async def check_election_status(short_name: str, session: Session | AsyncSession = Depends(get_session)):
+    """
+    GET
+
+    Returns the status of an election
+    """
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name, simple=True)
+    voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
+
+    trustee_params = [models.TrusteeCrypto.id, models.TrusteeCrypto.current_step]
+    trustees = await crud.get_trustee_crypto_params_by_election_id(session=session, election_id=election.id, params=trustee_params)
+
+    questions_params = [models.AbstractQuestion.id]
+    questions = await crud.get_questions_params_by_election_id(session=session, election_id=election.id, params=questions_params)
+
+    waiting_decryptions = filter(lambda t: t.current_step == TrusteeStepEnum.waiting_decryptions, trustees)
+    decryptions_uploaded = filter(lambda t: t.current_step == TrusteeStepEnum.decryptions_sent, trustees)
+    can_combine_decryptions = election.status == ElectionStatusEnum.decryptions_uploaded or (election.status == ElectionStatusEnum.tally_computed and len(list(decryptions_uploaded)) >= (len(trustees)) // 2 + 1)
+    opening_ready = len(list(waiting_decryptions)) == len(trustees) and election.status == ElectionStatusEnum.ready_key_generation
+
+    total_trustees = len(trustees)
+    total_voters = len(voters)
+    add_questions = len(questions) == 0 and election.status == ElectionStatusEnum.setting_up
+    add_voters = len(voters) == 0 and election.voters_login_type == ElectionLoginTypeEnum.close_p and election.status == ElectionStatusEnum.setting_up
+    add_trustees = len(trustees) == 0 and election.status == ElectionStatusEnum.setting_up
+
+    key_generation_ready = election.status == ElectionStatusEnum.setting_up and (total_voters > 0 or election.voters_login_type != ElectionLoginTypeEnum.close_p) and total_trustees > 0 and not add_questions
+
+    return {
+        "add_voters": add_voters,
+        "add_trustees": add_trustees,
+        "add_questions": add_questions,
+        "opening_ready": opening_ready,
+        "can_combine_decryptions": can_combine_decryptions,
+        "key_generation_ready": key_generation_ready,
+    }

@@ -16,12 +16,7 @@ from sqlalchemy import and_
 
 
 ELECTION_QUERY_OPTIONS = [
-    selectinload(models.Election.trustees),
-    selectinload(models.Election.sharedpoints),
-    selectinload(models.Election.audited_ballots),
     selectinload(models.Election.public_key),
-    selectinload(models.Election.questions),
-    selectinload(models.Election.result),
 ]
 
 COMPLETE_ELECTION_QUERY_OPTIONS = [
@@ -45,7 +40,7 @@ async def get_voters_by_election_id(session: Session | AsyncSession, election_id
 
     query_options = [] if simple else VOTER_QUERY_OPTIONS
     offset_value = page*page_size if page_size else None
-    query = select(models.Voter).outerjoin(models.CastVote).where(
+    query = select(models.Voter).where(
         models.Voter.election_id == election_id
     ).offset(offset_value).limit(page_size).options(
         *query_options
@@ -53,6 +48,38 @@ async def get_voters_by_election_id(session: Session | AsyncSession, election_id
 
     result = await db_handler.execute(session, query)
     return result.scalars().all()
+
+async def get_voters_by_group_and_weight_initial(session: Session | AsyncSession, election_id: int):
+    query = select(
+        models.Voter.group,
+        models.Voter.weight_init,
+        func.count(models.Voter.id).label('voter_count')
+    ).where(
+        models.Voter.election_id == election_id
+    ).group_by(
+        models.Voter.group,
+        models.Voter.weight_init
+    )
+
+    result = await db_handler.execute(session, query)
+    return result.all()
+
+
+async def get_voters_by_group_and_weight_valid(session: Session | AsyncSession, election_id: int):
+    query = (
+        select(
+            models.Voter.group,
+            models.Voter.weight_init,
+            models.Voter.weight_end,
+            func.count(models.Voter.id).label("voter_count"),
+        )
+        .outerjoin(models.CastVote)
+        .where(models.Voter.election_id == election_id, and_(models.CastVote.is_valid))
+        .group_by(models.Voter.group, models.Voter.weight_init, models.Voter.weight_end)
+    )
+
+    result = await db_handler.execute(session, query)
+    return result.all()
 
 
 async def get_voters_group_by_election_id(session: Session | AsyncSession, election_id: int, group: str, page=0, page_size=None, simple: bool = False):
@@ -263,3 +290,18 @@ async def get_trustee_crypto_by_id(session: Session | AsyncSession, trustee_cryp
     query = select(models.TrusteeCrypto).where(models.TrusteeCrypto.id == trustee_crypto_id)
     result = await db_handler.execute(session, query)
     return result.scalars().first()
+
+async def get_trustee_crypto_params_by_election_id(session: Session | AsyncSession, election_id: int, params: list):
+    query = select(*params).where(
+        models.TrusteeCrypto.election_id == election_id
+    )
+    result = await db_handler.execute(session, query)
+    return result.all()
+
+# === Questions ===
+async def get_questions_params_by_election_id(session: Session | AsyncSession, election_id: int, params: list):
+    query = select(*params).where(
+        models.AbstractQuestion.election_id == election_id
+    )
+    result = await db_handler.execute(session, query)
+    return result.all()
