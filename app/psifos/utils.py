@@ -5,13 +5,19 @@ Utilities for Psifos.
 """
 
 import json
+
+import pydantic
 import pytz
 
 from app.psifos.model.enums import ElectionLoginTypeEnum
 
 from datetime import datetime
-from app.config import TIMEZONE
-from functools import reduce
+from app.config import TIMEZONE, REDIS_URL
+from functools import reduce, wraps
+from aiocache import Cache, AIOCACHE_CACHES
+from fastapi import HTTPException
+from app.psifos.model import schemas
+from fastapi.encoders import jsonable_encoder
 
 # -- JSON manipulation --
 
@@ -87,3 +93,47 @@ def paginate(data_json: dict):
     page = page_size * page
 
     return page, page_size
+
+
+## -- Handle cache --
+# Example for caching election route
+def cache_election_response(ttl: int = 60, namespace: str = "main"):
+    """
+    Caching decorator for FastAPI endpoints.
+
+    ttl: Time to live for the cache in seconds.
+    namespace: Namespace for cache keys in Redis.
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            element_id = kwargs.get('short_name')  # Assuming the element ID is the first argument 
+            cache_key = f"{namespace}:{element_id}"
+
+            # cache = Cache.REDIS(endpoint="redis", port=6379, namespace=namespace)
+            cache = Cache.from_url(REDIS_URL)
+
+            # Try to retrieve data from cache
+            cached_value = await cache.get(cache_key)
+            if cached_value:
+                return cached_value  # Return cached data
+
+            # Call the actual function if cache is not hit
+            response = await func(*args, **kwargs)
+            response_serialized = jsonable_encoder(response)
+            print(response_serialized)
+            response_serialized["public_key"]["p"] = response_serialized["public_key"]["_p"]
+            response_serialized["public_key"]["y"] = response_serialized["public_key"]["_y"]
+            response_serialized["public_key"]["g"] = response_serialized["public_key"]["_g"]
+            response_serialized["public_key"]["q"] = response_serialized["public_key"]["_q"]
+            response_as_schema = schemas.ElectionOut.parse_obj(response_serialized).json()
+            
+            try:
+                # Store the response in Redis with a TTL
+                await cache.set(cache_key, json.loads(response_as_schema), ttl=ttl)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error caching data: {e}")
+
+            return response
+        return wrapper
+    return decorator
