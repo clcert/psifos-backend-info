@@ -127,7 +127,7 @@ async def get_cast_vote_by_hash(session: Session | AsyncSession, hash_vote: str)
 
 
 async def get_hashes_vote(session: Session | AsyncSession, voters_id: list):
-    query = select(models.CastVote.vote_hash).where(
+    query = select(models.CastVote.encrypted_ballot_hash).where(
         models.CastVote.voter_id.in_(voters_id)
     )
     result = await db_handler.execute(session, query)

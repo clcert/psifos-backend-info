@@ -468,7 +468,7 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
     if voter_name:
         voters = [
             v for v in voters
-            if unidecode(voter_name.lower()) in unidecode(v.voter_name.lower()) or
+            if unidecode(voter_name.lower()) in unidecode(v.name.lower()) or
                unidecode(voter_name.lower()) in unidecode(v.username.lower())
         ]
         return schemas.UrnaOut(voters=voters, position=0, more_votes=False, total_votes=len(voters))
