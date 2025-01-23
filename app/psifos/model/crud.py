@@ -299,6 +299,14 @@ async def get_trustee_crypto_params_by_election_id(session: Session | AsyncSessi
     return result.all()
 
 # === Questions ===
+
+async def get_questions_by_election_id(session: Session | AsyncSession, election_id: int):
+    query = select(models.AbstractQuestion).where(
+        models.AbstractQuestion.election_id == election_id
+    )
+    result = await db_handler.execute(session, query)
+    return result.scalars().all()
+
 async def get_questions_params_by_election_id(session: Session | AsyncSession, election_id: int, params: list):
     query = select(*params).where(
         models.AbstractQuestion.election_id == election_id

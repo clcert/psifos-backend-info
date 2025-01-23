@@ -116,9 +116,11 @@ async def get_questions(short_name: str, session: Session | AsyncSession = Depen
     """
     Route for get the questions of an election
     """
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election_params = [models.Election.id]
+    election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=election_params)
+    questions = await crud.get_questions_by_election_id(session=session, election_id=election.id)
     return {
-        "questions": election.questions
+        "questions": [schemas.QuestionBase.from_orm(q) for q in questions]
     }
 
 @api_router.post("/{short_name}/count-dates", status_code=200)
@@ -456,20 +458,22 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
     vote_hash = data.get("vote_hash", "")
     voter_name = data.get("voter_name", "")
     only_with_valid_vote = data.get("only_with_valid_vote")
-    election = await crud.get_election_by_short_name(session=session, short_name=short_name)
+    election = await crud.get_election_by_short_name(session=session, short_name=short_name, simple=True)
 
     if only_with_valid_vote:
         voters = await crud.get_voters_with_valid_vote(session=session, election_id=election.id)
     else:
         voters = await crud.get_voters_by_election_id(session=session, election_id=election.id)
 
-    if voter_name != "":
-        voters = list(
-            filter(lambda v: (unidecode(voter_name.lower()) in unidecode(v.voter_name.lower())) or (unidecode(voter_name.lower()) in unidecode(v.username.lower())), voters))
-            # filter(lambda v: voter_name.lower() in v.voter_name.lower(), voters))
+    if voter_name:
+        voters = [
+            v for v in voters
+            if unidecode(voter_name.lower()) in unidecode(v.voter_name.lower()) or
+               unidecode(voter_name.lower()) in unidecode(v.username.lower())
+        ]
         return schemas.UrnaOut(voters=voters, position=0, more_votes=False, total_votes=len(voters))
 
-    elif vote_hash != "":
+    if vote_hash:
         voters_id = [v.id for v in voters]
         hash_votes = await crud.get_hashes_vote(session=session, voters_id=voters_id)
 
@@ -480,7 +484,6 @@ async def get_votes(short_name: str, data: dict = {}, session: Session | AsyncSe
     if only_with_valid_vote:
         voters_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page, page_size=page_size)
         voters_next_page = await crud.get_voters_with_valid_vote(session=session, election_id=election.id, page=page + 1, page_size=page_size)
-
     else:
         voters_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page, page_size=page_size)
         voters_next_page = await crud.get_voters_by_election_id(session=session, election_id=election.id, page=page + 1, page_size=page_size)
