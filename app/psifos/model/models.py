@@ -16,11 +16,12 @@ from sqlalchemy import (
     Text,
     Enum,
     DateTime,
-    JSON
+    JSON,
 )
+from sqlalchemy.dialects.mysql import LONGTEXT
 
 
-from app.psifos.model.enums import ElectionStatusEnum, ElectionTypeEnum, ElectionLoginTypeEnum
+from app.psifos.model.enums import ElectionStatusEnum, ElectionTypeEnum, ElectionLoginTypeEnum, TrusteeStepEnum
 from app.database import Base
 from app.psifos import utils
 
@@ -33,52 +34,53 @@ class Election(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     admin_id = Column(Integer, ForeignKey("auth_user.id"))
-    uuid = Column(String(50), nullable=False, unique=True)
 
-    short_name = Column(String(100), nullable=False, unique=True)
-    name = Column(String(250), nullable=False)
-    election_type = Column(Enum(ElectionTypeEnum), nullable=False)
-    election_status = Column(Enum(ElectionStatusEnum), default="setting_up")
-    election_login_type =  Column(Enum(ElectionLoginTypeEnum), default="close_p")
+    short_name = Column(String(50), nullable=False, unique=True)
+    long_name = Column(String(150), nullable=False)
+    type = Column(Enum(ElectionTypeEnum), nullable=False)
+    status = Column(Enum(ElectionStatusEnum), default="setting_up")
+    voters_login_type =  Column(Enum(ElectionLoginTypeEnum), default="close_p")
     description = Column(Text)
+    
+    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id", ondelete="CASCADE"), nullable=True, unique=True)
+    public_key = relationship("PublicKey", back_populates="elections", uselist=False, cascade="all, delete")
 
-    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True)
-    questions = relationship("AbstractQuestion", back_populates="election")
+    questions = relationship("AbstractQuestion", cascade="all, delete", back_populates="election")
 
-    obscure_voter_names = Column(Boolean, default=False, nullable=False)
-    randomize_answer_order = Column(Boolean, default=False, nullable=False)
-    normalization = Column(Boolean, default=False, nullable=False)
-    grouped = Column(Boolean, default=False, nullable=False)
+    randomized_options = Column(Boolean, default=False, nullable=False)
+    normalized = Column(Boolean, default=False, nullable=False)
+    grouped_voters = Column(Boolean, default=False, nullable=False)
     max_weight = Column(Integer, nullable=False)
-
-    total_voters = Column(Integer, default=0)
-    total_trustees = Column(Integer, default=0)
-
-    encrypted_tally = relationship("Tally", back_populates="election")
 
     decryptions_uploaded = Column(Integer, default=0)
 
-    voting_started_at = Column(DateTime, nullable=True)
-    voting_ended_at = Column(DateTime, nullable=True)
+    result = relationship("Results",uselist=False, cascade="all, delete", backref="psifos_election")
 
-    voters_by_weight_init = Column(Text, nullable=True)
-    voters_by_weight_end = Column(Text, nullable=True)
-
-    result = relationship("Results",uselist=False, cascade="all, delete", back_populates="election")
-
-    public_key = relationship("PublicKey", back_populates="elections")
 
     # One-to-many relationships
     voters = relationship("Voter", cascade="all, delete",
                           backref="psifos_election")
     trustees = relationship(
-        "Trustee", cascade="all, delete", backref="psifos_election")
+        "TrusteeCrypto", cascade="all, delete", backref="psifos_election")
     sharedpoints = relationship(
         "SharedPoint", cascade="all, delete", backref="psifos_election"
     ) # TODO: Check 
     audited_ballots = relationship(
         "AuditedBallot", cascade="all, delete", backref="psifos_election"
     )
+
+    @property
+    def total_trustees(self):
+        return len(self.trustees)
+    
+    @property
+    def decryptions_uploaded(self):
+        sent_decryptions_trustees = [t for t in self.trustees if t.current_step == TrusteeStepEnum.decryptions_sent]
+        return len(sent_decryptions_trustees)
+    
+    @property
+    def total_questions(self):
+        return len(self.questions)
 
 class Voter(Base):
     __tablename__ = "psifos_voter"
@@ -89,12 +91,12 @@ class Voter(Base):
         ForeignKey("psifos_election.id",
                    onupdate="CASCADE", ondelete="CASCADE"),
     )
-    voter_login_id = Column(String(100), nullable=False)
-    voter_name = Column(String(200), nullable=False)
-    voter_weight = Column(Integer, nullable=False)
+    username = Column(String(100), nullable=False)
+    name = Column(String(200), nullable=False)
 
-    valid_cast_votes = Column(Integer, default=0)
-    invalid_cast_votes = Column(Integer, default=0)
+    username_election_id = Column(String(50), nullable=False, unique=True)
+    weight_init = Column(Integer, nullable=False)
+    weight_end = Column(Integer, nullable=True)
 
     group = Column(String(200), nullable=True)
     # One-to-one relationship
@@ -102,22 +104,21 @@ class Voter(Base):
         "CastVote", cascade="all, delete", backref="psifos_voter", uselist=False
     )
 
-
 class CastVote(Base):
     __tablename__ = "psifos_cast_vote"
 
     id = Column(Integer, primary_key=True, index=True)
-    voter_id = Column(Integer, ForeignKey("psifos_voter.id", onupdate="CASCADE", ondelete="CASCADE"), unique=True)
+    voter_id = Column(
+        Integer,
+        ForeignKey("psifos_voter.id", onupdate="CASCADE", ondelete="CASCADE"),
+        unique=True,
+    )
 
-    vote = Column(Text, nullable=False)
-    vote_hash = Column(String(500), nullable=False)
-    # vote_tinyhash = Column(String(500), nullable=False)
+    encrypted_ballot = Column(Text, nullable=False)
+    encrypted_ballot_hash = Column(String(500), nullable=False)
 
     is_valid = Column(Boolean, nullable=False)
-
-
     cast_at = Column(DateTime, nullable=False)
-
 
 class AuditedBallot(Base):
     __tablename__ = "psifos_audited_ballot"
@@ -134,37 +135,59 @@ class Trustee(Base):
     __tablename__ = "psifos_trustee"
 
     id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(String(200), nullable=False)
+    username = Column(String(100), nullable=False, unique=True)
+    email = Column(Text, nullable=False)
+    trustee_crypto = relationship(
+        "TrusteeCrypto", cascade="all, delete",
+        back_populates="trustee"
+    ) 
+
+class TrusteeCrypto(Base):
+    __tablename__ = "psifos_trustee_crypto"
+
+    id = Column(Integer, primary_key=True, index=True)
     election_id = Column(
         Integer,
         ForeignKey("psifos_election.id",
                    onupdate="CASCADE", ondelete="CASCADE"),
     )
     trustee_id = Column(
+        Integer,
+        ForeignKey("psifos_trustee.id",
+                   onupdate="CASCADE", ondelete="CASCADE"),
+    )
+
+    trustee_election_id = Column(
         Integer, nullable=False
     )  # TODO: rename to index for deambiguation with trustee_id func. param at await crud.py
-    uuid = Column(String(50), nullable=False, unique=True)
-
-    name = Column(String(200), nullable=False)
-    trustee_login_id = Column(String(100), nullable=False)
-    email = Column(Text, nullable=False)
 
     current_step = Column(Integer, default=0)
 
-    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True)
+    public_key = relationship("PublicKey", back_populates="trustees", uselist=False, single_parent=True)
+    public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True, unique=True)
+
     public_key_hash = Column(String(100), nullable=True)
     decryptions_homomorphic = relationship(
-        "HomomorphicDecryption", cascade="all, delete", back_populates="psifos_trustee"
+        "HomomorphicDecryption", cascade="all, delete", back_populates="trustee_crypto"
     )
     decryptions_mixnet = relationship(
-        "MixnetDecryption", cascade="all, delete", back_populates="psifos_trustee"
+        "MixnetDecryption", cascade="all, delete", back_populates="trustee_crypto"
     )
     certificate = Column(Text, nullable=True)
     coefficients = Column(Text, nullable=True)
     acknowledgements = Column(Text, nullable=True)
 
-    public_key = relationship("PublicKey", back_populates="trustees")
+    trustee = relationship("Trustee", back_populates="trustee_crypto")
 
-
+    def get_decryptions_group(self, group):
+        if self.decryptions:
+            decryptions_group = filter(
+                lambda dic: dic.group == group, self.decryptions.instances
+            )
+            return next(decryptions_group)
+        return None
 class SharedPoint(Base):
     __tablename__ = "psifos_shared_point"
 
@@ -211,22 +234,32 @@ class AbstractQuestion(Base):
     __tablename__ = "psifos_questions"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"), nullable=False)
-    q_num = Column(Integer, nullable=False)
-    q_type = Column(Enum(QuestionTypeEnum), nullable=False)
-    q_text = Column(Text, nullable=False)
-    q_description = Column(Text, nullable=True)
-    total_options = Column(Integer, nullable=False)
-    total_closed_options = Column(Integer, nullable=False)
-    closed_options = Column(Text, nullable=True)
+    election_id = Column(Integer, ForeignKey("psifos_election.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    index = Column(Integer, nullable=False)
+    type = Column(Enum(QuestionTypeEnum), nullable=False)
+    title = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    formal_options = Column(JSON, nullable=True)
     max_answers = Column(Integer, nullable=False)
-    min_answers = Column(Integer, nullable=False)
-    include_blank_null = Column(String(50), nullable=True)
+    min_answers = Column(Integer, nullable=False) 
+    include_informal_options = Column(String(50), nullable=True)
     tally_type = Column(String(50), nullable=False)
-    group_votes = Column(String(50), nullable=True)
+    grouped_options = Column(String(50), nullable=True)
     num_of_winners = Column(Integer, nullable=True)
+    excluded_options = Column(Boolean, nullable=True)
+    options_specifications = Column(JSON, nullable=True)
+    open_option_max_size = Column(Integer, nullable=True)
+    total_open_options = Column(Integer, nullable=True)
 
-    election = relationship("Election", back_populates="questions")
+    election = relationship("Election", back_populates="questions", cascade="all, delete")
+    encrypted_tally = relationship("Tally", back_populates="question")
+
+    decryptions_homomorphic = relationship(
+        "HomomorphicDecryption", cascade="all, delete", back_populates="question"
+    )
+    decryptions_mixnet = relationship(
+        "MixnetDecryption", cascade="all, delete", back_populates="question"
+    )
 
     TALLY_TYPE_MAP = {
         QuestionTypeEnum.CLOSED: "HOMOMORPHIC",
@@ -236,16 +269,16 @@ class AbstractQuestion(Base):
 
     def __init__(self, *args, **kwargs):
         super(AbstractQuestion, self).__init__(*args, **kwargs)
-        self.tally_type = self.TALLY_TYPE_MAP.get(self.q_type, "")
-
+        self.tally_type = self.TALLY_TYPE_MAP.get(self.type, "CLOSED")
+    
     @property
-    def closed_options_list(self):
-        return json.loads(self.closed_options) if self.closed_options else []
+    def total_options(self):
+        """Calculate the length of formal_options if it exists, otherwise return 0."""
+        if not self.formal_options:
+            return 0
 
-    @closed_options_list.setter
-    def closed_options_list(self, value):
-        self.closed_options = json.dumps(value)
-
+        informal_options_count = 2 if self.include_informal_options else 0
+        return len(self.formal_options) + informal_options_count
 class PublicKey(Base):
     __tablename__ = "psifos_public_keys"
 
@@ -255,7 +288,7 @@ class PublicKey(Base):
     _g = Column('g', Text, nullable=False)
     _q = Column('q', Text, nullable=False)
 
-    trustees = relationship("Trustee", back_populates="public_key")
+    trustees = relationship("TrusteeCrypto", back_populates="public_key")
     elections = relationship("Election", back_populates="public_key")
 
     @property
@@ -311,29 +344,29 @@ class Tally(Base):
     __tablename__ = "psifos_tallies"
 
     id = Column(Integer, primary_key=True, index=True)
-    election_id = Column(Integer, ForeignKey("psifos_election.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("psifos_questions.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     group = Column(Text, nullable=False)
     with_votes = Column(Boolean, default=False)
     tally_type = Column(Enum(TallyTypeEnum), nullable=False)
-    q_num = Column(Integer, nullable=False)
-    num_options = Column(Integer, nullable=False, default=0)
     computed = Column(Boolean, default=False)
     num_tallied = Column(Integer, nullable=False, default=0)
-    max_answers = Column(Integer, nullable=True)
-    num_of_winners = Column(Integer, nullable=True)
-    include_blank_null = Column(Boolean, nullable=True)
-    tally = Column(Text, nullable=False, default=[])
+    encrypted_tally = Column(LONGTEXT, nullable=False, default=[])
 
-    election = relationship("Election", back_populates="encrypted_tally")
+    question = relationship("AbstractQuestion", cascade="all, delete", back_populates="encrypted_tally")
 
-    def __repr__(self):
-        return f"Tally(id={self.id}, tally_type={self.tally_type}, election_id={self.election_id}, group={self.group}, with_votes={self.with_votes})"
+    @property
+    def index(self):
+        """Calculate the length of formal_options if it exists, otherwise return 0."""
+        if not self.question:
+            return None
+        return self.question.index
     
-    __mapper_args__ = {
-        'polymorphic_on': tally_type,
-        'polymorphic_identity': 'tally',
-        'with_polymorphic': '*'
-    }
+    @property
+    def num_options(self):
+        """Calculate the length of formal_options if it exists, otherwise return 0."""
+        if not self.question:
+            return 0
+        return self.question.total_options
 
 class HomomorphicTally(Tally):
     """
@@ -388,17 +421,19 @@ class HomomorphicDecryption(Base):
     __tablename__ = "psifos_decryptions_homomorphic"
 
     id = Column(Integer, primary_key=True, index=True)
-    trustee_id = Column(Integer, ForeignKey("psifos_trustee.id"), nullable=False)
+    trustee_crypto_id = Column(Integer, ForeignKey("psifos_trustee_crypto.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    question_id = Column(Integer, ForeignKey("psifos_questions.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     group = Column(Text, nullable=False)
-    q_num = Column(Integer, nullable=False)
 
-    psifos_trustee = relationship("Trustee", back_populates="decryptions_homomorphic")
+    trustee_crypto = relationship("TrusteeCrypto", back_populates="decryptions_homomorphic", cascade="all, delete")
+    question = relationship("AbstractQuestion", cascade="all, delete", back_populates="decryptions_homomorphic")
+
     decryption_factors = Column(Text, nullable=True)
     decryption_proofs = Column(Text, nullable=True)
 
-    def __init__(self, decryption_factors, decryption_proofs, decryption_type, **kwargs) -> None:
-        super(HomomorphicDecryption, self).__init__(**kwargs)
-        self.decryption_type = decryption_type
+    @property
+    def index(self):
+        return self.question.index
 
 
 class MixnetDecryption(Base):
@@ -412,14 +447,16 @@ class MixnetDecryption(Base):
     __tablename__ = "psifos_decryptions_mixnet"
 
     id = Column(Integer, primary_key=True, index=True)
-    trustee_id = Column(Integer, ForeignKey("psifos_trustee.id"), nullable=False)
+    trustee_crypto_id = Column(Integer, ForeignKey("psifos_trustee_crypto.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    question_id = Column(Integer, ForeignKey("psifos_questions.id", onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     group = Column(Text, nullable=False)
-    q_num = Column(Integer, nullable=False)
 
-    psifos_trustee = relationship("Trustee", back_populates="decryptions_mixnet")
+    trustee_crypto = relationship("TrusteeCrypto", back_populates="decryptions_mixnet", cascade="all, delete")
+    question = relationship("AbstractQuestion", cascade="all, delete", back_populates="decryptions_mixnet")
+
     decryption_factors = Column(Text, nullable=True)
     decryption_proofs = Column(Text, nullable=True)
 
-    def __init__(self, decryption_factors, decryption_proofs, decryption_type, **kwargs) -> None:
-        super(MixnetDecryption, self).__init__(**kwargs)
-        self.decryption_type = decryption_type
+    @property
+    def index(self):
+        return self.question.index
