@@ -219,7 +219,7 @@ async def get_total_voters_by_election_id(session: Session | AsyncSession, elect
     return result.scalar()
 
 async def get_total_trustees_by_election_id(session: Session | AsyncSession, election_id: int):
-    query = select(func.count(models.Trustee.id)).where(
+    query = select(func.count(models.TrusteeCrypto.trustee_id)).where(
         models.TrusteeCrypto.election_id == election_id
     )
     result = await db_handler.execute(session, query)
