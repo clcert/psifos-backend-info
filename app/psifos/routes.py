@@ -511,7 +511,8 @@ async def check_election_status(short_name: str, session: Session | AsyncSession
 
     waiting_decryptions = filter(lambda t: t.current_step == TrusteeStepEnum.waiting_decryptions, trustees)
     decryptions_uploaded = filter(lambda t: t.current_step == TrusteeStepEnum.decryptions_sent, trustees)
-    can_combine_decryptions = election.status == ElectionStatusEnum.decryptions_uploaded or (election.status == ElectionStatusEnum.tally_computed and len(list(decryptions_uploaded)) >= (len(trustees)) // 2 + 1)
+
+    can_combine_decryptions = election.status == ElectionStatusEnum.decryptions_uploaded or (election.status == ElectionStatusEnum.tally_computed and len(list(decryptions_uploaded)) >= len(trustees) // 2 + 1)
     opening_ready = len(list(waiting_decryptions)) == len(trustees) and election.status == ElectionStatusEnum.ready_key_generation
 
     total_trustees = len(trustees)

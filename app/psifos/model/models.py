@@ -163,7 +163,7 @@ class TrusteeCrypto(Base):
         Integer, nullable=False
     )  # TODO: rename to index for deambiguation with trustee_id func. param at await crud.py
 
-    current_step = Column(Integer, default=0)
+    current_step = Column(Enum(TrusteeStepEnum), default=0)
 
     public_key = relationship("PublicKey", back_populates="trustees", uselist=False, single_parent=True)
     public_key_id = Column(Integer, ForeignKey("psifos_public_keys.id"), nullable=True, unique=True)
