@@ -519,9 +519,9 @@ async def check_election_status(short_name: str, session: Session | AsyncSession
     total_voters = len(voters)
     add_questions = len(questions) == 0 and election.status == ElectionStatusEnum.setting_up
     add_voters = len(voters) == 0 and election.voters_login_type == ElectionLoginTypeEnum.close_p and election.status == ElectionStatusEnum.setting_up
-    add_trustees = len(trustees) == 0 and election.status == ElectionStatusEnum.setting_up
+    add_trustees = len(trustees) == 0 and election.status == ElectionStatusEnum.setting_up and not election.has_psifos_trustees
 
-    key_generation_ready = election.status == ElectionStatusEnum.setting_up and (total_voters > 0 or election.voters_login_type != ElectionLoginTypeEnum.close_p) and total_trustees > 0 and not add_questions
+    key_generation_ready = election.status == ElectionStatusEnum.setting_up and (total_voters > 0 or election.voters_login_type != ElectionLoginTypeEnum.close_p) and (total_trustees > 0 or election.has_psifos_trustees) and not add_questions
 
     return {
         "add_voters": add_voters,
