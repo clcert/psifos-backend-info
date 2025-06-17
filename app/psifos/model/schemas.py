@@ -156,6 +156,7 @@ class QuestionBase(BaseModel):
     tally_type: str
     grouped_options: bool | None
     num_of_winners: int | None
+    options_specifications: object | None
 
     class Config:
         orm_mode = True
