@@ -62,7 +62,7 @@ class TrusteeBase(BaseModel):
 
     name: str
     email: str
-    trustee_login_id: str
+    username: str
 
 # model (sqla) ModelElection -> SchemaElection
 
@@ -74,7 +74,6 @@ class TrusteeOut(TrusteeBase):
 
     id: int
     trustee_id: int
-    uuid: str
     current_step: int
     public_key: object | None
     public_key_hash: str | None
@@ -95,7 +94,7 @@ class CastVoteBase(BaseModel):
     Basic castvote schema.
     """
 
-    vote: str | None
+    encrypted_ballot: str | None
 
 
 class CastVoteOut(CastVoteBase):
@@ -103,8 +102,7 @@ class CastVoteOut(CastVoteBase):
     Schema for reading/returning castvote data.
     """
 
-    vote_hash: str | None
-    hash_cast_ip: str | None
+    encrypted_ballot_hash: str | None
     cast_at: datetime | None
 
     class Config:
@@ -119,9 +117,9 @@ class VoterBase(BaseModel):
     Basic election schema.
     """
 
-    voter_login_id: str
-    voter_weight: int
-    voter_name: str
+    username: str
+    weight_init: int
+    name: str
 
 
 class VoterOut(VoterBase):
@@ -129,9 +127,6 @@ class VoterOut(VoterBase):
     Schema for reading/returning voter data.
     """
 
-    voter_login_id: str
-    voter_name: str
-    voter_weight: int
     group: str | None
 
     class Config:
@@ -150,19 +145,18 @@ class QuestionBase(BaseModel):
     """
     Schema for creating a question.
     """
-    q_num: int
-    q_type: str
-    q_text: str
-    q_description: str | None
-    total_options: int
-    total_closed_options: int
-    closed_options_list: List[str] | None
+    index: int
+    type: str
+    title: str
+    description: str | None
+    formal_options: List[str] | None
     max_answers: int
     min_answers: int
-    include_blank_null: bool | None
+    include_informal_options: bool | None
     tally_type: str
-    group_votes: bool | None
+    grouped_options: bool | None
     num_of_winners: int | None
+    options_specifications: object | None
 
     class Config:
         orm_mode = True
@@ -174,15 +168,14 @@ class ElectionBase(BaseModel):
     """
 
     short_name: str = Field(max_length=100)
-    name: str = Field(max_length=100)
+    long_name: str = Field(max_length=100)
     description: str | None
-    election_type: ElectionTypeEnum = Field(max_length=100)
+    type: ElectionTypeEnum = Field(max_length=100)
     max_weight: int
-    obscure_voter_names: bool | None
     randomize_answer_order: bool | None
-    election_login_type: ElectionLoginTypeEnum =Field(max_length=100)
-    normalization: bool | None
-    grouped: bool | None
+    voters_login_type: ElectionLoginTypeEnum =Field(max_length=100)
+    normalized: bool | None
+    grouped_voters: bool | None
 
 
 class ElectionOut(ElectionBase):
@@ -191,22 +184,14 @@ class ElectionOut(ElectionBase):
     """
 
     id: int
-    uuid: str
-    election_status: ElectionStatusEnum
-    decryptions_uploaded: int
+    status: ElectionStatusEnum
     public_key: PublicKeyBase | None
     questions: list[QuestionBase] | None
-    total_voters: int
-    total_trustees: int
     encrypted_tally_hash: str | None
     result: object | None
     voters_by_weight_init: str | None
     voters_by_weight_end: str | None
     trustees: object | None
-
-
-    class Config:
-        orm_mode = True
 
     class Config:
         orm_mode = True
@@ -255,7 +240,7 @@ class ElectionLogOut(BaseModel):
     log_level: str
     event: str
     event_params: str
-    created_at: str
+    created_at: datetime
 
     class Config:
         orm_mode = True
