@@ -119,6 +119,7 @@ class VoterBase(BaseModel):
 
     username: str
     weight_init: int
+    weight_end: int
     name: str
 
 
