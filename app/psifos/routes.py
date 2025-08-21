@@ -6,7 +6,7 @@ from app.psifos.model import bundle_schemas
 from sqlalchemy.orm import Session
 from urllib.parse import unquote
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.psifos.model.enums import ElectionPublicEventEnum, TrusteeStepEnum, ElectionStatusEnum, ElectionLoginTypeEnum
+from app.psifos.model.enums import ElectionPublicEventEnum, TrusteeStepEnum, ElectionStatusEnum, ElectionLoginTypeEnum, ElectionTypeEnum
 from datetime import timedelta
 from app.psifos.model import models
 
@@ -76,16 +76,25 @@ async def get_election_stats(short_name: str, session: Session | AsyncSession = 
     query_options = [
         models.Election.id,
         models.Election.status,
-        models.Election.short_name
+        models.Election.short_name,
+        models.Election.type
     ]
 
     election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=query_options)
     total_voters = await crud.get_total_voters_by_election_id(session=session, election_id=election.id)
-    return {
-        "num_casted_votes": await crud.get_num_casted_votes(
+
+    if election.type == ElectionTypeEnum.public_vote_election:
+        num_casted_votes = await crud.get_num_public_casted_votes(
             session=session,
             election_id=election.id
-        ),
+        )
+    else:
+        num_casted_votes = await crud.get_num_casted_votes(
+            session=session,
+            election_id=election.id
+        )
+    return {
+        "num_casted_votes": num_casted_votes,
         "total_voters": total_voters,
         "status": election.status,
         "name": election.short_name
@@ -438,7 +447,15 @@ async def get_vote_by_hash(short_name: str, hash_vote, session: Session | AsyncS
     This route return a cast vote by its hash
 
     """
+    election_params = [
+        models.Election.id,
+        models.Election.type
+    ]
+    election = await crud.get_election_options_by_name(session=session, short_name=short_name, options=election_params)
     hash_vote = unquote(unquote(hash_vote))
+    if election.type == ElectionTypeEnum.public_vote_election:
+        return await crud.get_public_vote_by_hash(session=session, hash_vote=hash_vote)
+
     return await crud.get_cast_vote_by_hash(session=session, hash_vote=hash_vote)
 
 
@@ -513,13 +530,15 @@ async def check_election_status(short_name: str, session: Session | AsyncSession
     decryptions_uploaded = filter(lambda t: t.current_step == TrusteeStepEnum.decryptions_sent, trustees)
 
     can_combine_decryptions = election.status == ElectionStatusEnum.decryptions_uploaded or (election.status == ElectionStatusEnum.tally_computed and len(list(decryptions_uploaded)) >= len(trustees) // 2 + 1)
-    opening_ready = len(list(waiting_decryptions)) == len(trustees) and election.status == ElectionStatusEnum.ready_key_generation
+    close_key_generation_ready = (len(list(waiting_decryptions)) == len(trustees) and election.status == ElectionStatusEnum.ready_key_generation and election.type != ElectionTypeEnum.public_vote_election)
+
+    opening_ready = election.status == ElectionStatusEnum.ready_opening or (election.type == ElectionTypeEnum.public_vote_election and election.status == ElectionStatusEnum.setting_up and len(questions) > 0 and len(voters) > 0)
 
     total_trustees = len(trustees)
     total_voters = len(voters)
     add_questions = len(questions) == 0 and election.status == ElectionStatusEnum.setting_up
     add_voters = len(voters) == 0 and election.voters_login_type == ElectionLoginTypeEnum.close_p and election.status == ElectionStatusEnum.setting_up
-    add_trustees = len(trustees) == 0 and election.status == ElectionStatusEnum.setting_up
+    add_trustees = (len(trustees) == 0 and election.status == ElectionStatusEnum.setting_up) and election.type != ElectionTypeEnum.public_vote_election
 
     key_generation_ready = election.status == ElectionStatusEnum.setting_up and (total_voters > 0 or election.voters_login_type != ElectionLoginTypeEnum.close_p) and total_trustees > 0 and not add_questions
 
@@ -528,6 +547,7 @@ async def check_election_status(short_name: str, session: Session | AsyncSession
         "add_trustees": add_trustees,
         "add_questions": add_questions,
         "opening_ready": opening_ready,
+        "close_key_generation_ready": close_key_generation_ready,
         "can_combine_decryptions": can_combine_decryptions,
         "key_generation_ready": key_generation_ready,
     }

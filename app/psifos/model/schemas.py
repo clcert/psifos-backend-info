@@ -94,6 +94,7 @@ class CastVoteBase(BaseModel):
     Basic castvote schema.
     """
 
+    ballot : list[int] | None
     encrypted_ballot: str | None
 
 

@@ -33,7 +33,6 @@ class Election(Base):
     __tablename__ = "psifos_election"
 
     id = Column(Integer, primary_key=True, index=True)
-    admin_id = Column(Integer, ForeignKey("auth_user.id"))
 
     short_name = Column(String(50), nullable=False, unique=True)
     long_name = Column(String(150), nullable=False)
@@ -119,6 +118,21 @@ class CastVote(Base):
 
     is_valid = Column(Boolean, nullable=False)
     cast_at = Column(DateTime, nullable=False)
+
+class Vote(Base):
+    __tablename__ = "psifos_vote"
+
+    id = Column(Integer, primary_key=True, index=True)
+    voter_id = Column(
+        Integer,
+        ForeignKey("psifos_voter.id",
+                   onupdate="CASCADE", ondelete="CASCADE"),
+    )
+
+    vote = Column(JSON, nullable=False)
+    vote_hash = Column(String(500), nullable=False)
+    is_valid = Column(Boolean, nullable=False)
+    cast_at = Column(DateTime, default=utils.tz_now())
 
 class AuditedBallot(Base):
     __tablename__ = "psifos_audited_ballot"

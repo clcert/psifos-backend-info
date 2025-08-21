@@ -125,6 +125,12 @@ async def get_cast_vote_by_hash(session: Session | AsyncSession, hash_vote: str)
     result = await db_handler.execute(session, query)
     return result.scalars().first()
 
+async def get_public_vote_by_hash(session: Session | AsyncSession, hash_vote: str):
+    query = select(models.Vote).where(
+        models.Vote.vote_hash == hash_vote
+    )
+    result = await db_handler.execute(session, query)
+    return result.scalars().first()
 
 async def get_hashes_vote(session: Session | AsyncSession, voters_id: list):
     query = select(models.CastVote.encrypted_ballot_hash).where(
@@ -250,6 +256,17 @@ async def get_num_casted_votes(session: Session | AsyncSession, election_id: int
         .join(models.Voter, models.Voter.id == models.CastVote.voter_id)
         .where(models.Voter.election_id == election_id)
         .where(models.CastVote.is_valid == True)
+    )
+    
+    result = await session.scalar(query)    
+    return result or 0
+
+async def get_num_public_casted_votes(session: Session | AsyncSession, election_id: int):
+    query = (
+        select(func.count(distinct(models.Vote.voter_id)))
+        .join(models.Voter, models.Voter.id == models.Vote.voter_id)
+        .where(models.Voter.election_id == election_id)
+        .where(models.Vote.is_valid == True)
     )
     
     result = await session.scalar(query)    
