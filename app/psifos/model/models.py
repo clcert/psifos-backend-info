@@ -51,6 +51,7 @@ class Election(Base):
     normalized = Column(Boolean, default=False, nullable=False)
     grouped_voters = Column(Boolean, default=False, nullable=False)
     max_weight = Column(Integer, nullable=False)
+    has_psifos_trustees = Column(Boolean, default=False, nullable=False)
 
     decryptions_uploaded = Column(Integer, default=0)
 
